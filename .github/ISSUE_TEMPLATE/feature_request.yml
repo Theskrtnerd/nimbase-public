@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose an improvement to Nimbase
+title: "feat: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or workflow gap should Nimbase address?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Proposed outcome
+      description: Describe the behavior you would like to see, including CLI examples when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What workarounds or alternative designs have you considered?
+    validations:
+      required: false

@@ -1,0 +1,7 @@
+{
+  "model": "openai/text-embedding-3-small",
+  "k": 5,
+  "recallAtK": 1,
+  "mrr": 1,
+  "queries": 38
+}

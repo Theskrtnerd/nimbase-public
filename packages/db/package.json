@@ -1,0 +1,114 @@
+{
+  "name": "@acme/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./src/client.ts"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./src/schema.ts"
+    },
+    "./slug": {
+      "types": "./dist/slug.d.ts",
+      "default": "./src/slug.ts"
+    },
+    "./access-core": {
+      "types": "./dist/access-core.d.ts",
+      "default": "./src/access-core.ts"
+    },
+    "./provider-access": {
+      "types": "./dist/provider-access.d.ts",
+      "default": "./src/provider-access.ts"
+    },
+    "./node-metadata": {
+      "types": "./dist/node-metadata.d.ts",
+      "default": "./src/node-metadata.ts"
+    },
+    "./node-metadata-merge": {
+      "types": "./dist/node-metadata-merge.d.ts",
+      "default": "./src/node-metadata-merge.ts"
+    }
+  },
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "tsc",
+    "backfill:permissions": "infisical run --env dev -- tsx src/scripts/backfill-permissions.ts",
+    "migrate:company-identity": "infisical run --env dev -- tsx src/scripts/apply-company-identity.ts",
+    "migrate:company-identity:prod": "infisical run --env prod -- tsx src/scripts/apply-company-identity.ts",
+    "migrate:ai-config": "infisical run --env dev -- tsx src/scripts/apply-ai-config.ts",
+    "migrate:ai-config:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-ai-config.ts",
+    "migrate:artifact-anchor": "infisical run --env dev -- tsx src/scripts/apply-artifact-folder-anchor.ts",
+    "migrate:artifact-anchor:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-artifact-folder-anchor.ts",
+    "migrate:artifact-visibility": "infisical run --env dev -- tsx src/scripts/apply-artifact-visibility.ts",
+    "migrate:artifact-visibility:prod": "infisical run --env prod -- tsx src/scripts/apply-artifact-visibility.ts",
+    "migrate:artifact-slug": "infisical run --env dev -- tsx src/scripts/apply-artifact-slug.ts",
+    "migrate:artifact-slug:prod": "infisical run --env prod -- tsx src/scripts/apply-artifact-slug.ts",
+    "migrate:node-tags": "infisical run --env dev -- tsx src/scripts/apply-node-tags.ts",
+    "migrate:node-tags:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-node-tags.ts",
+    "migrate:node-title": "infisical run --env dev -- tsx src/scripts/apply-node-title.ts",
+    "migrate:node-title:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-node-title.ts",
+    "migrate:node-sources": "infisical run --env dev -- tsx src/scripts/apply-node-sources.ts",
+    "migrate:node-sources:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-node-sources.ts",
+    "migrate:backfill-node-title": "infisical run --env dev -- tsx src/scripts/backfill-node-title.ts",
+    "migrate:backfill-node-title:prod": "dotenv -e ../../.env.production -- tsx src/scripts/backfill-node-title.ts",
+    "migrate:source-columns": "infisical run --env dev -- tsx src/scripts/apply-source-columns.ts",
+    "migrate:source-columns:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-source-columns.ts",
+    "migrate:operator-audit": "infisical run --env dev -- tsx src/scripts/apply-operator-audit.ts",
+    "migrate:operator-audit:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-operator-audit.ts",
+    "migrate:integrations": "infisical run --env dev -- tsx src/scripts/apply-integrations.ts",
+    "migrate:integrations:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-integrations.ts",
+    "migrate:widget-slug": "infisical run --env dev -- tsx src/scripts/apply-widget-slug.ts",
+    "migrate:widget-slug:prod": "infisical run --env prod -- tsx src/scripts/apply-widget-slug.ts",
+    "migrate:widget-agent-interface": "infisical run --env dev -- tsx src/scripts/apply-widget-agent-interface.ts",
+    "migrate:widget-agent-interface:prod": "infisical run --env prod -- tsx src/scripts/apply-widget-agent-interface.ts",
+    "migrate:agent-artifact": "infisical run --env dev -- tsx src/scripts/apply-agent-artifact.ts",
+    "migrate:agent-artifact:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-agent-artifact.ts",
+    "migrate:agent-slug": "infisical run --env dev -- tsx src/scripts/apply-agent-slug.ts",
+    "migrate:agent-slug:prod": "infisical run --env prod -- tsx src/scripts/apply-agent-slug.ts",
+    "migrate:onboarding": "infisical run --env dev -- tsx src/scripts/apply-onboarding.ts",
+    "migrate:onboarding:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-onboarding.ts",
+    "migrate:provider-access": "pnpm migrate:company-identity && infisical run --env dev -- tsx src/scripts/apply-provider-access.ts",
+    "migrate:provider-access:prod": "pnpm migrate:company-identity:prod && infisical run --env prod -- tsx src/scripts/apply-provider-access.ts",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config",
+    "push": "pnpm with-env drizzle-kit push",
+    "push:prod": "pnpm with-env:prod drizzle-kit push",
+    "studio": "pnpm with-env drizzle-kit studio",
+    "studio:prod": "pnpm with-env:prod drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false",
+    "with-env": "infisical run --env dev --",
+    "with-env:prod": "dotenv -e ../../.env.production --"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "0.10.0",
+    "@nimbase/connector-sdk": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "drizzle-zod": "^0.8.3",
+    "pg": "^8.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.5",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "tsx": "^4.20.6",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "prettier": "@acme/prettier-config"
+}

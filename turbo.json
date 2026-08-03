@@ -1,0 +1,124 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "topo": {
+      "dependsOn": ["^topo"]
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".cache/tsbuildinfo.json", "dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["^dev"],
+      "cache": false,
+      "persistent": false
+    },
+    "format": {
+      "outputs": [".cache/.prettiercache"],
+      "outputLogs": "new-only"
+    },
+    "lint": {
+      "dependsOn": ["^topo", "^build"],
+      "outputs": [".cache/.eslintcache"]
+    },
+    "typecheck": {
+      "dependsOn": ["^topo", "^build"],
+      "outputs": [".cache/tsbuildinfo.json"]
+    },
+    "test": {
+      "dependsOn": ["^topo"],
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    },
+    "//#clean": {
+      "cache": false
+    },
+    "push": {
+      "cache": false,
+      "interactive": true
+    },
+    "studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "ui-add": {
+      "cache": false,
+      "interactive": true
+    }
+  },
+  "globalEnv": [
+    "POSTGRES_URL",
+    "NIMBASE_DATABASE_DRIVER",
+    "NIMBASE_EDITION",
+    "NIMBASE_HARNESS_SURFACES",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL",
+    "NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL",
+    "NEXT_PUBLIC_NIMBASE_SOURCE_URL",
+    "CLERK_SECRET_KEY",
+    "PORT",
+    "RESEND_API_KEY",
+    "DESKTOP_AUTH_SECRET",
+    "NIMBASE_WEB_URL",
+    "NIMBASE_DOCS_HOST",
+    "DOCS_BUILDER_REPO",
+    "DOCS_BUILDER_TOKEN",
+    "DOCS_BUILDER_CALLBACK_SECRET",
+    "ARTIFACT_RENDERER_URL",
+    "ARTIFACT_RENDERER_TOKEN",
+    "CHROMIUM_PATH",
+    "RENDERER_TOKEN",
+    "RENDERER_CONCURRENCY",
+    "AI_GATEWAY_API_KEY",
+    "CONTEXT_DEV_API_KEY",
+    "OPENAI_API_KEY",
+    "NIMBASE_S3_BUCKET",
+    "NIMBASE_S3_REGION",
+    "NIMBASE_AWS_ACCESS_KEY_ID",
+    "NIMBASE_AWS_SECRET_ACCESS_KEY",
+    "NIMBASE_S3_ENDPOINT",
+    "NIMBASE_S3_FORCE_PATH_STYLE",
+    "QSTASH_TOKEN",
+    "QSTASH_CURRENT_SIGNING_KEY",
+    "QSTASH_NEXT_SIGNING_KEY",
+    "NIMBASE_AI_API_KEY",
+    "NIMBASE_AI_PROVIDER",
+    "NIMBASE_AI_BASE_URL",
+    "NIMBASE_AI_CHAT_MODEL",
+    "NIMBASE_AI_NORMALIZE_MODEL",
+    "NIMBASE_AI_EMBED_MODEL",
+    "NIMBASE_OPERATOR_USER_IDS",
+    "GODS",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_PRICE_PRO",
+    "STRIPE_PORTAL_RETURN_URL",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY",
+    "LANGFUSE_BASE_URL",
+    "SLACK_CLIENT_ID",
+    "SLACK_CLIENT_SECRET",
+    "SLACK_SIGNING_SECRET",
+    "AGENT_CONNECTION_SECRET"
+  ],
+  "globalPassThroughEnv": [
+    "NODE_ENV",
+    "CI",
+    "VERCEL",
+    "VERCEL_ENV",
+    "VERCEL_URL",
+    "npm_lifecycle_event",
+    "PATH",
+    "HOME",
+    "OPENCODE_BIN_PATH",
+    "XDG_CONFIG_HOME",
+    "NIMBASE_TOKEN",
+    "NIMBASE_API_URL",
+    "EVAL_UPDATE_BASELINE"
+  ]
+}

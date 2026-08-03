@@ -1,0 +1,40 @@
+name: Contributor License Agreement
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  cla:
+    name: cla
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify contributor assent
+        env:
+          ACTOR: ${{ github.event.pull_request.user.login }}
+          BODY: ${{ github.event.pull_request.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${ACTOR}" in
+            "dependabot[bot]" | "github-actions[bot]")
+              echo "Trusted automation account; CLA assent is not required."
+              exit 0
+              ;;
+          esac
+
+          marker_lower="- [x] I have read and agree to the Nimbase Contributor License Agreement."
+          marker_upper="- [X] I have read and agree to the Nimbase Contributor License Agreement."
+
+          if grep -Fqx -- "${marker_lower}" <<< "${BODY}" || \
+             grep -Fqx -- "${marker_upper}" <<< "${BODY}"; then
+            echo "CLA affirmed by ${ACTOR}."
+            exit 0
+          fi
+
+          echo "::error::Read CLA.md and check the Contributor License Agreement box in the pull request description."
+          exit 1

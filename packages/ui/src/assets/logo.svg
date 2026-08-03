@@ -1,0 +1,21 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Company logo optimized for multiple sizes and uses -->
+  <g transform="translate(512, 512)">
+    <!-- Dark inner field to define the space between the outer shell and center mark -->
+    <circle cx="0" cy="0" r="300" fill="#244d6c"/>
+
+    <!-- Three segments forming a circle - scaled to fill viewBox -->
+    <path d="M 0,-450 A 450,450 0 0,1 389.71,225 L 259.8,150 A 300,300 0 0,0 0,-300 Z"
+          fill="#4FC3F7"/>
+
+    <path d="M 389.71,225 A 450,450 0 0,1 -389.71,225 L -259.8,150 A 300,300 0 0,0 259.8,150 Z"
+          fill="#29B6F6"/>
+
+    <path d="M -389.71,225 A 450,450 0 0,1 0,-450 L 0,-300 A 300,300 0 0,0 -259.8,150 Z"
+          fill="#0288D1"/>
+
+    <!-- Center star - restored filled treatment for stronger small-size clarity -->
+    <path d="M 0,-180 L 60,-60 L 180,0 L 60,60 L 0,180 L -60,60 L -180,0 L -60,-60 Z"
+          fill="#f4fbff"/>
+  </g>
+</svg>

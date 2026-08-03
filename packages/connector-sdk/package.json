@@ -1,0 +1,54 @@
+{
+  "name": "@nimbase/connector-sdk",
+  "version": "0.1.0",
+  "description": "Wire contracts for building out-of-process Nimbase sync connectors",
+  "type": "module",
+  "homepage": "https://github.com/Theskrtnerd/nimbase-public/tree/main/packages/connector-sdk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Theskrtnerd/nimbase-public.git",
+    "directory": "packages/connector-sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/Theskrtnerd/nimbase-public/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config",
+    "prepublishOnly": "pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "tsup": "^8.3.5",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "prettier": "@acme/prettier-config"
+}

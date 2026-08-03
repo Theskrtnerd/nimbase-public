@@ -1,0 +1,156 @@
+@import "tailwindcss";
+@import "@acme/tailwind-config/theme";
+
+@source "../../../../packages/ui/src/*.{ts,tsx}";
+@source "../../../../packages/mdx/src/*.{ts,tsx}";
+
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
+@custom-variant auto (&:where(.auto, .auto *));
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    letter-spacing: var(--tracking-normal);
+  }
+
+  /* Scrollbars: no track background, thumb hidden until the scroll area is
+     hovered/active. Opt out with `.no-scrollbar`. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover {
+    scrollbar-color: var(--color-border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+  }
+  *:hover::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted-foreground);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * Clerk: hide the auto-rendered brand logo above the form. Title + subtitle
+ * stay visible — Clerk handles the heading on each step.
+ */
+.cl-logoBox,
+.cl-logoImage {
+  display: none !important;
+}
+
+/*
+ * Cosmic surface — the "home-cosmos" star-map / atmosphere treatment shared by
+ * the auth pages and the post-login dashboard home.
+ */
+.cosmos-star-map {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--border), transparent 50%) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--border), transparent 56%) 1px,
+      transparent 1px
+    );
+  background-size:
+    28px 28px,
+    28px 28px;
+  background-repeat: repeat;
+}
+
+.cosmos-atmosphere {
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      color-mix(in oklch, var(--chart-2), transparent 88%) 0%,
+      transparent 46%
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in oklch, var(--background), transparent 6%) 0%,
+      color-mix(in oklch, var(--background), transparent 38%) 42%,
+      color-mix(in oklch, var(--background), transparent 100%) 72%
+    );
+}
+
+.cosmos-logo-shell {
+  position: relative;
+}
+
+.cosmos-logo-mark {
+  position: relative;
+}
+
+/*
+ * Nimbus mascot halo + soft inner light, scaled up for the auth rail.
+ */
+.cosmos-nimbus-halo {
+  position: absolute;
+  inset: -16% -10% -10% -10%;
+  background: radial-gradient(
+    circle at 50% 45%,
+    color-mix(in oklch, #e1f5fe, transparent 32%) 0%,
+    color-mix(in oklch, var(--chart-2), transparent 78%) 38%,
+    transparent 70%
+  );
+  filter: blur(20px);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.cosmos-nimbus-mark {
+  filter: drop-shadow(0 22px 36px color-mix(in oklch, #0c4984, transparent 55%))
+    drop-shadow(0 6px 16px color-mix(in oklch, #4fc3f7, transparent 70%));
+}
+
+/*
+ * WCAG 2.3.3 — honor the OS "reduce motion" setting for CSS-driven animation
+ * and transitions. JS-driven `motion/react` animations are handled separately
+ * by <MotionProvider> (MotionConfig reducedMotion="user") in layout.tsx, since
+ * CSS cannot reach those.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

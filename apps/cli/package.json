@@ -1,0 +1,66 @@
+{
+  "name": "nimbase",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "Nimbase CLI — capture, compile, and deploy company memory from the terminal.",
+  "keywords": [
+    "nimbase",
+    "cli",
+    "memory",
+    "context",
+    "mcp",
+    "agents"
+  ],
+  "homepage": "https://nimbase.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Theskrtnerd/nimbase-public.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Theskrtnerd/nimbase-public/issues"
+  },
+  "license": "Apache-2.0",
+  "bin": {
+    "nimbase": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "@acme/validators": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "tsup": "^8.3.5",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "prettier": "@acme/prettier-config"
+}

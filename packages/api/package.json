@@ -1,0 +1,100 @@
+{
+  "name": "@acme/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./access": {
+      "types": "./dist/lib/access.d.ts",
+      "default": "./src/lib/access.ts"
+    },
+    "./operator": {
+      "types": "./dist/lib/operator.d.ts",
+      "default": "./src/lib/operator.ts"
+    },
+    "./access-core": {
+      "types": "./dist/lib/access-core.d.ts",
+      "default": "./src/lib/access-core.ts"
+    },
+    "./provider-access": {
+      "types": "./dist/lib/provider-access.d.ts",
+      "default": "./src/lib/provider-access.ts"
+    },
+    "./entitlements": {
+      "types": "./dist/lib/entitlements.d.ts",
+      "default": "./src/lib/entitlements.ts"
+    },
+    "./edition": {
+      "types": "./dist/lib/edition.d.ts",
+      "default": "./src/lib/edition.ts"
+    },
+    "./deployment-surfaces-control": {
+      "types": "./dist/lib/deployment-surfaces-control.d.ts",
+      "default": "./src/lib/deployment-surfaces-control.ts"
+    },
+    "./capture-targets": {
+      "types": "./dist/lib/capture-targets.d.ts",
+      "default": "./src/lib/capture-targets.ts"
+    },
+    "./connection-control": {
+      "types": "./dist/lib/connection-control.d.ts",
+      "default": "./src/lib/connection-control.ts"
+    },
+    "./deployment-control": {
+      "types": "./dist/lib/deployment-control.d.ts",
+      "default": "./src/lib/deployment-control.ts"
+    },
+    "./node-metadata": {
+      "types": "./dist/lib/node-metadata.d.ts",
+      "default": "./src/lib/node-metadata.ts"
+    },
+    "./workspace-control": {
+      "types": "./dist/lib/workspace-control.d.ts",
+      "default": "./src/lib/workspace-control.ts"
+    },
+    "./workspace-ai-config": {
+      "types": "./dist/lib/workspace-ai-config.d.ts",
+      "default": "./src/lib/workspace-ai-config.ts"
+    },
+    "./plan-override": {
+      "types": "./dist/lib/plan-override.d.ts",
+      "default": "./src/lib/plan-override.ts"
+    },
+    "./plan-transition": {
+      "types": "./dist/lib/plan-transition.d.ts",
+      "default": "./src/lib/plan-transition.ts"
+    }
+  },
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build": "tsc",
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "dev": "tsc",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "NODE_OPTIONS=--experimental-strip-types eslint --flag unstable_native_nodejs_ts_config",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@acme/cloud": "workspace:*",
+    "@acme/db": "workspace:*",
+    "@trpc/server": "11.18.0",
+    "superjson": "2.2.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@acme/eslint-config": "workspace:*",
+    "@acme/prettier-config": "workspace:*",
+    "@acme/tsconfig": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
+  },
+  "prettier": "@acme/prettier-config"
+}

@@ -1,0 +1,46 @@
+name: nimbase
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17
+    environment:
+      POSTGRES_DB: nimbase
+      POSTGRES_USER: nimbase
+      POSTGRES_PASSWORD: nimbase-local
+    ports:
+      - "5432:5432"
+    volumes:
+      - nimbase-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nimbase -d nimbase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: nimbase
+      MINIO_ROOT_PASSWORD: nimbase-local
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - nimbase-minio:/data
+  create-bucket:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >-
+        until mc alias set local http://minio:9000 nimbase nimbase-local;
+        do sleep 1; done;
+        mc mb --ignore-existing local/nimbase
+
+volumes:
+  nimbase-postgres:
+  nimbase-minio:

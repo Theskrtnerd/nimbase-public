@@ -1,0 +1,39 @@
+diff --git a/dist/index.js b/dist/index.js
+index bd3f844e40b988e25f74efa69435813d7f20b211..5fd2b458e25c3348e85a9478c96d1e5dc9910467 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -12,6 +12,16 @@ import { isAbsolute, posix } from "path";
+ import {
+   extractLines
+ } from "@ai-sdk/provider-utils";
++function shellQuoteJustBashPatch(value) {
++  return "'" + String(value).replace(/'/g, "'\\''") + "'";
++}
++function withExportedEnvJustBashPatch(command, env) {
++  if (env === void 0) return command;
++  const exports = Object.entries(env).map(
++    ([key, value]) => `export ${key}=${shellQuoteJustBashPatch(value)};`
++  ).join(" ");
++  return exports.length > 0 ? `${exports} ${command}` : command;
++}
+ var JustBashSandboxSession = class {
+   constructor(sandbox) {
+     this.sandbox = sandbox;
+@@ -35,7 +45,7 @@ var JustBashSandboxSession = class {
+     abortSignal == null ? void 0 : abortSignal.throwIfAborted();
+     const finished = await this.sandbox.runCommand({
+       cmd: "bash",
+-      args: ["-c", command],
++      args: ["-c", withExportedEnvJustBashPatch(command, env)],
+       ...workingDirectory !== void 0 ? { cwd: workingDirectory } : {},
+       ...env !== void 0 ? { env } : {},
+       ...abortSignal !== void 0 ? { signal: abortSignal } : {}
+@@ -59,7 +69,7 @@ var JustBashSandboxSession = class {
+     abortSignal == null ? void 0 : abortSignal.throwIfAborted();
+     const live = await this.sandbox.runCommand({
+       cmd: "bash",
+-      args: ["-c", command],
++      args: ["-c", withExportedEnvJustBashPatch(command, env)],
+       detached: true,
+       ...workingDirectory !== void 0 ? { cwd: workingDirectory } : {},
+       ...env !== void 0 ? { env } : {},

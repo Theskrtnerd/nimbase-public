@@ -1,0 +1,414 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { processArtifactGenerateJob } from "./generate";
+
+const mocks = vi.hoisted(() => ({
+  generateText: vi.fn(),
+  traceGeneration: vi.fn((_trace: unknown, generate: () => unknown) =>
+    generate(),
+  ),
+  buildArtifactHtml: vi.fn(),
+  hasUnsafeScript: vi.fn(),
+  putObject: vi.fn(),
+  harnessEnabledFor: vi.fn(() => false),
+  runHarnessAgent: vi.fn(),
+  readOutput: vi.fn(),
+  prime: vi.fn(),
+  updateSet: vi.fn(),
+  insertValues: vi.fn(),
+}));
+
+vi.mock("ai", () => ({
+  generateText: mocks.generateText,
+  isStepCount: () => ({}),
+  tool: (def: unknown) => def,
+}));
+vi.mock("@acme/db", () => ({ and: vi.fn(), eq: vi.fn() }));
+vi.mock("@acme/db/schema", () => ({ Artifact: {}, SpendLedger: {} }));
+vi.mock("@acme/db/client", () => ({
+  db: {
+    update: vi.fn(() => ({ set: mocks.updateSet })),
+    insert: vi.fn(() => ({ values: mocks.insertValues })),
+  },
+}));
+vi.mock("@acme/cloud", () => ({
+  buildArtifactHtml: mocks.buildArtifactHtml,
+  traceGeneration: mocks.traceGeneration,
+  ARTIFACT_THEME_HEAD: "<style>/* theme */</style>",
+  ARTIFACT_MERMAID_HEAD: "<script>/* mermaid */</script>",
+  // Mirrors the real predicate; its own edge cases are covered canonically in
+  // packages/cloud/src/artifact-mermaid.test.ts. Here it only needs to be
+  // faithful enough to exercise the freeform injection branch.
+  usesMermaid: (s: string) =>
+    /class(?:Name)?\s*=\s*["'`][^"'`]*\bmermaid\b/.test(s),
+  resolveModels: () =>
+    Promise.resolve({
+      chat: {
+        id: "anthropic/claude-sonnet-4.6",
+        model: "anthropic/claude-sonnet-4.6",
+      },
+    }),
+  // Faithful to the registry's sonnet pricing (300/1500 cents per MTok); exact
+  // math is covered by packages/cloud/src/ai/cost.test.ts.
+  costFor: (_id: string, u: { inputTokens: number; outputTokens: number }) =>
+    Math.round((u.inputTokens * 300 + u.outputTokens * 1500) / 1_000_000),
+  s3: {
+    s3KeyFor: {
+      artifactHtml: (w: string, id: string) =>
+        `workspaces/${w}/artifactes/${id}.html`,
+      artifactSource: (w: string, id: string) =>
+        `workspaces/${w}/artifactes/${id}.tsx`,
+    },
+    putObject: mocks.putObject,
+    getObjectText: vi.fn(),
+  },
+}));
+vi.mock("@acme/cloud/memory/wiki", () => ({
+  WikiReadFs: class {},
+  readTools: () => ({}),
+}));
+vi.mock("@acme/cloud/harness", () => ({
+  harnessEnabledFor: mocks.harnessEnabledFor,
+  runHarnessAgent: mocks.runHarnessAgent,
+  buildHarnessMounts: () => ({ fs: {}, readOutput: mocks.readOutput }),
+  kbSearchTool: () => ({ search: {} }),
+  resolveHarnessModel: () =>
+    Promise.resolve({ modelId: "anthropic/claude-sonnet-4.6", pi: {} }),
+  WikiFileSystem: { readOnly: () => ({ prime: mocks.prime }) },
+}));
+vi.mock("~/server/share/artifact-prompts", () => ({
+  ARTIFACT_FIXED_SYSTEM: "fixed-system",
+  ARTIFACT_FREEFORM_SYSTEM: "freeform-system",
+  ARTIFACT_KB_GUIDANCE: "kb-guidance",
+  themeInstruction: () => "theme-instruction",
+}));
+vi.mock("~/server/share/sanitize", () => ({
+  hasUnsafeScript: mocks.hasUnsafeScript,
+  stripCodeFence: (s: string) => s,
+}));
+
+const base = {
+  jobId: "job-1",
+  artifactId: "artifact-1",
+  workspaceId: "ws-1",
+  prompt: "make a dashboard",
+  themeMode: "app" as const,
+  readScopes: null,
+};
+
+const genReply = (text: string) => ({
+  text,
+  totalUsage: { inputTokens: 1000, outputTokens: 2000 },
+});
+
+describe("processArtifactGenerateJob", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.updateSet.mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
+    mocks.insertValues.mockResolvedValue([]);
+    mocks.putObject.mockResolvedValue(undefined);
+  });
+
+  it("freeform success: uploads html, marks draft, records spend", async () => {
+    mocks.generateText.mockResolvedValue(genReply("<html>ok</html>"));
+    mocks.hasUnsafeScript.mockReturnValue(false);
+
+    await processArtifactGenerateJob({ ...base, kind: "freeform" });
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      expect.stringContaining("<html>"),
+      "text/html",
+    );
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "draft",
+        error: null,
+        s3KeyHtml: "workspaces/ws-1/artifactes/artifact-1.html",
+      }),
+    );
+    // (1000 * 300 + 2000 * 1500) / 1_000_000 = 3.3 → 3 cents
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "artifact",
+        cents: 3,
+        workspaceId: "ws-1",
+      }),
+    );
+  });
+
+  it("freeform: injects the mermaid loader only when a diagram is present", async () => {
+    mocks.generateText.mockResolvedValue(
+      genReply(
+        `<html><head></head><body><pre class="mermaid">graph TD; A-->B;</pre></body></html>`,
+      ),
+    );
+    mocks.hasUnsafeScript.mockReturnValue(false);
+
+    await processArtifactGenerateJob({ ...base, kind: "freeform" });
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      expect.stringContaining("/* mermaid */"),
+      "text/html",
+    );
+  });
+
+  it("freeform: leaves a diagram-free document without the mermaid loader", async () => {
+    mocks.generateText.mockResolvedValue(
+      genReply("<html><head></head><body>plain</body></html>"),
+    );
+    mocks.hasUnsafeScript.mockReturnValue(false);
+
+    await processArtifactGenerateJob({ ...base, kind: "freeform" });
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      expect.not.stringContaining("/* mermaid */"),
+      "text/html",
+    );
+  });
+
+  // The sanitizer runs on raw model output, before injection — so a model that
+  // tries to write its own script tag is still rejected.
+  it("freeform with unsafe script: marks failed and rethrows", async () => {
+    mocks.generateText.mockResolvedValue(genReply("<html>bad</html>"));
+    mocks.hasUnsafeScript.mockReturnValue(true);
+
+    await expect(
+      processArtifactGenerateJob({ ...base, kind: "freeform" }),
+    ).rejects.toThrow("unsafe_output");
+
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: expect.stringContaining("unsafe_output") as unknown,
+      }),
+    );
+    expect(mocks.insertValues).not.toHaveBeenCalled();
+  });
+
+  it("empty model output: marks failed and rethrows", async () => {
+    mocks.generateText.mockResolvedValue(genReply("   "));
+
+    await expect(
+      processArtifactGenerateJob({ ...base, kind: "fixed" }),
+    ).rejects.toThrow("empty_output");
+
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed" }),
+    );
+    expect(mocks.putObject).not.toHaveBeenCalled();
+  });
+
+  it("fixed transpile failure: marks failed and rethrows after exhausting repairs", async () => {
+    mocks.generateText.mockResolvedValue(genReply("export default x"));
+    mocks.buildArtifactHtml.mockImplementation(() => {
+      throw new Error("Unexpected token");
+    });
+
+    await expect(
+      processArtifactGenerateJob({ ...base, kind: "fixed" }),
+    ).rejects.toThrow("transpile_failed");
+
+    // One generation + ARTIFACT_MAX_REPAIR_ATTEMPTS repairs, then it gives up.
+    expect(mocks.generateText).toHaveBeenCalledTimes(3);
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "failed" }),
+    );
+    expect(mocks.putObject).not.toHaveBeenCalled();
+  });
+
+  it("fixed transpile failure: repairs from the build error and succeeds", async () => {
+    mocks.generateText
+      .mockResolvedValueOnce(genReply("export default broken"))
+      .mockResolvedValueOnce(genReply("export default fixed"));
+    mocks.buildArtifactHtml
+      .mockImplementationOnce(() => {
+        throw new Error("Unexpected token (455:12)");
+      })
+      .mockReturnValueOnce("<!doctype html>repaired");
+
+    await processArtifactGenerateJob({ ...base, kind: "fixed" });
+
+    // The repair turn is tool-free and must show the model both the compiler
+    // error and the source it indexes into.
+    const repairCall = mocks.generateText.mock.calls[1]?.[0] as {
+      prompt: string;
+      tools?: unknown;
+    };
+    expect(repairCall.prompt).toContain("Unexpected token (455:12)");
+    expect(repairCall.prompt).toContain("export default broken");
+    expect(repairCall.tools).toBeUndefined();
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      "<!doctype html>repaired",
+      "text/html",
+    );
+    // The repaired source is what gets stored, not the broken first attempt.
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.tsx",
+      "export default fixed",
+      "text/plain",
+    );
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "draft", error: null }),
+    );
+    // Both turns are billed: 3 cents for the generation + 3 for the repair.
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "artifact", cents: 6 }),
+    );
+  });
+
+  it("freeform unsafe script: a repaired document is accepted", async () => {
+    mocks.generateText
+      .mockResolvedValueOnce(genReply("<html><script>bad</script></html>"))
+      .mockResolvedValueOnce(genReply("<html>clean</html>"));
+    mocks.hasUnsafeScript.mockReturnValueOnce(true).mockReturnValueOnce(false);
+
+    await processArtifactGenerateJob({ ...base, kind: "freeform" });
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      expect.stringContaining("clean"),
+      "text/html",
+    );
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "draft" }),
+    );
+  });
+
+  it("gives up rather than repairing when the model returns nothing", async () => {
+    mocks.generateText
+      .mockResolvedValueOnce(genReply("export default broken"))
+      .mockResolvedValueOnce(genReply("   "));
+    mocks.buildArtifactHtml.mockImplementation(() => {
+      throw new Error("Unexpected token");
+    });
+
+    await expect(
+      processArtifactGenerateJob({ ...base, kind: "fixed" }),
+    ).rejects.toThrow("transpile_failed");
+
+    // An empty repair ends the loop immediately — retrying on nothing would
+    // just burn the remaining attempt on the same empty prompt.
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells a truncated first attempt to shorten, not just fix syntax", async () => {
+    mocks.generateText
+      .mockResolvedValueOnce({
+        ...genReply("export default truncated"),
+        finishReason: "length",
+      })
+      .mockResolvedValueOnce(genReply("export default fixed"));
+    mocks.buildArtifactHtml
+      .mockImplementationOnce(() => {
+        throw new Error("Unexpected token (455:12)");
+      })
+      .mockReturnValueOnce("<!doctype html>ok");
+
+    await processArtifactGenerateJob({ ...base, kind: "fixed" });
+
+    const repairCall = mocks.generateText.mock.calls[1]?.[0] as {
+      prompt: string;
+    };
+    expect(repairCall.prompt).toContain("cut off at the output-token limit");
+  });
+
+  it("fixed success: uploads html and tsx source", async () => {
+    mocks.generateText.mockResolvedValue(genReply("export default fn"));
+    mocks.buildArtifactHtml.mockReturnValue("<html>built</html>");
+
+    await processArtifactGenerateJob({ ...base, kind: "fixed" });
+
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.tsx",
+      "export default fn",
+      "text/plain",
+    );
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "draft",
+        s3KeySource: "workspaces/ws-1/artifactes/artifact-1.tsx",
+      }),
+    );
+  });
+});
+
+describe("processArtifactGenerateJob (Pi harness path)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.harnessEnabledFor.mockReturnValue(true);
+    mocks.updateSet.mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
+    mocks.insertValues.mockResolvedValue([]);
+    mocks.putObject.mockResolvedValue(undefined);
+    mocks.runHarnessAgent.mockResolvedValue({
+      text: "fallback text",
+      usage: { inputTokens: 1000, outputTokens: 2000 },
+    });
+  });
+
+  it("fixed: reads the artifact from /output/artifact.tsx and never calls generateText", async () => {
+    mocks.readOutput.mockResolvedValue("export default fn");
+    mocks.buildArtifactHtml.mockReturnValue("<html>built</html>");
+
+    await processArtifactGenerateJob({ ...base, kind: "fixed" });
+
+    expect(mocks.generateText).not.toHaveBeenCalled();
+    expect(mocks.prime).toHaveBeenCalled();
+    expect(mocks.readOutput).toHaveBeenCalledWith("/output/artifact.tsx");
+    const call = mocks.runHarnessAgent.mock.calls[0]?.[0] as {
+      agent: string;
+      prompt: string;
+    };
+    expect(call.agent).toBe("artifact");
+    expect(call.prompt).toContain("/output/artifact.tsx");
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.tsx",
+      "export default fn",
+      "text/plain",
+    );
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "draft" }),
+    );
+    // Usage comes from the harness run: same 1000/2000 → 3 cents.
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "artifact", cents: 3 }),
+    );
+  });
+
+  it("freeform: falls back to the final message text when no output file exists", async () => {
+    mocks.readOutput.mockResolvedValue(null);
+    mocks.runHarnessAgent.mockResolvedValue({
+      text: "<html>from message</html>",
+      usage: { inputTokens: 10, outputTokens: 10 },
+    });
+    mocks.hasUnsafeScript.mockReturnValue(false);
+
+    await processArtifactGenerateJob({ ...base, kind: "freeform" });
+
+    expect(mocks.readOutput).toHaveBeenCalledWith("/output/artifact.html");
+    expect(mocks.putObject).toHaveBeenCalledWith(
+      "workspaces/ws-1/artifactes/artifact-1.html",
+      expect.stringContaining("from message"),
+      "text/html",
+    );
+  });
+
+  it("harness failure marks the artifact failed and rethrows", async () => {
+    mocks.runHarnessAgent.mockRejectedValue(new Error("session timed out"));
+
+    await expect(
+      processArtifactGenerateJob({ ...base, kind: "fixed" }),
+    ).rejects.toThrow("session timed out");
+
+    expect(mocks.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "failed",
+        error: expect.stringContaining("timed out") as unknown,
+      }),
+    );
+  });
+});

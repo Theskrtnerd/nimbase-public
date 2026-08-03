@@ -1,0 +1,17 @@
+{
+  "extends": "@acme/tsconfig/base.json",
+  "compilerOptions": {
+    // "dom" is for the callbacks handed to page.evaluate — they are serialized
+    // and run inside Chromium, not in this Node process.
+    "lib": ["ES2022", "dom"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // Source imports carry `.ts` so `node --experimental-strip-types` runs the
+    // sources directly in dev; tsc rewrites them to `.js` on emit for `start`.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "rootDir": "."
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

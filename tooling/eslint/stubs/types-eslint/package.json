@@ -1,0 +1,6 @@
+{
+  "name": "@types/eslint",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Empty stub — ESLint 9 ships its own types, @types/eslint conflicts with @eslint/core"
+}

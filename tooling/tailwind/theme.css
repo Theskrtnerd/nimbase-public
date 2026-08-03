@@ -1,0 +1,218 @@
+@import "tw-animate-css";
+
+/*
+ * `dark` variant is intentionally neutralized: dark mode is produced by a
+ * single global invert filter (see `html.dark` below), not per-token
+ * overrides. Any `dark:` utility is a no-op so the filter is the sole
+ * source of dark mode and there is only one palette to maintain.
+ */
+@custom-variant dark (&:where(.__dark-disabled__));
+
+/*
+ * Nimbase Theme
+ * Slack "Ochin" brand system — a single light palette. Dark mode is the
+ * same palette run through `filter: invert(1) hue-rotate(180deg)`, so
+ * colors never have to be tuned twice.
+ * Accent: one deep ocean blue (~#0C4984, hue-248) used for both --primary
+ * and the activity-bar rail — a single token, no separate chrome color.
+ */
+
+:root {
+  /* Tint hue shared by all surface tokens — overridden per data-accent */
+  --accent-hue: 248;
+
+  /* ── Dark-mode dial ───────────────────────────────────────────────
+     The single knob for dark mode. Dark mode is the light palette run
+     through `invert(1) hue-rotate(180deg) contrast(var(--dark-contrast))`
+     (see `html.dark` below). Lower it for a softer, brighter dark UI
+     (blacks lift toward grey, whites toward off-white); raise toward 1
+     for a harder, higher-contrast near-black. Keep it in (0, 1].
+
+     `invert` stays at 1 (the only self-inverse amount) so opted-out
+     brand art restores exactly; `contrast` is the tweakable part
+     because it is cleanly reversible via `calc(1 / --dark-contrast)`. */
+  --dark-contrast: 0.72;
+
+  /* Light mode — white base, soft blue-grey fills (#E7EEF4) */
+  /* Main content stays white; the filetree/chat sidebars carry the soft
+     blue-grey (#E7EEF4) via --sidebar so they read as distinct surfaces. */
+  --background: oklch(0.995 0 0);
+  --foreground: oklch(0.18 0.04 var(--accent-hue));
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.04 var(--accent-hue));
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.04 var(--accent-hue));
+  /* Ochin primary — the one ocean-blue. This is also the activity-bar /
+     chrome rail color: primary and chrome are a single token so the
+     accent stays consistent everywhere. Chroma is absolute (25%, not a
+     fraction, which would render a duller navy). Deep navy (~#194176)
+     per the dashboard shell design. Hover/active states on the rail are
+     opacity tints of --primary-foreground (see app.tsx / activity-bar.tsx). */
+  --primary: oklch(38% 25% var(--accent-hue));
+  --primary-foreground: oklch(0.98 0.01 var(--accent-hue));
+  /* Soft blue-grey fills — #E7EEF4 */
+  --secondary: oklch(0.946 0.011 var(--accent-hue));
+  --secondary-foreground: oklch(0.26 0.05 var(--accent-hue));
+  --muted: oklch(0.946 0.011 var(--accent-hue));
+  --muted-foreground: oklch(0.4 0 0);
+  --accent: oklch(0.946 0.011 var(--accent-hue));
+  --accent-foreground: oklch(0.52 0.13 var(--accent-hue));
+  /* Ochin mention / "New" rule — #E01E5A */
+  --destructive: oklch(0.56 0.21 9);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.8 0 0);
+  --input: oklch(0.88 0 0);
+  --ring: oklch(0.52 0.13 var(--accent-hue));
+  --chart-1: oklch(0.52 0.13 var(--accent-hue));
+  --chart-2: oklch(0.7 0.16 calc(var(--accent-hue) - 21));
+  --chart-3: oklch(0.78 0.11 calc(var(--accent-hue) + 15));
+  --chart-4: oklch(0.55 0.19 calc(var(--accent-hue) - 31));
+  --chart-5: oklch(0.5 0.16 calc(var(--accent-hue) + 29));
+  /* Filetree + chat panels — soft blue-grey #E7EEF4; row hover/selected
+     sits a shade deeper so it still reads against the panel. */
+  --sidebar: oklch(95% 3% var(--accent-hue));
+  --sidebar-foreground: oklch(0.18 0.04 var(--accent-hue));
+  --sidebar-accent: oklch(0.905 0.022 var(--accent-hue));
+  --sidebar-accent-foreground: oklch(0.52 0.13 var(--accent-hue));
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.52 0.13 var(--accent-hue));
+  --radius: 0.625rem;
+  --shadow-2xs: 0 1px 2px 0 oklch(0.36 0.04 var(--accent-hue) / 0.05);
+  --shadow-xs: 0 1px 3px 0 oklch(0.34 0.05 var(--accent-hue) / 0.07);
+  --shadow-sm:
+    0 1px 3px 0 oklch(0.34 0.05 var(--accent-hue) / 0.09),
+    0 1px 2px -1px oklch(0.34 0.05 var(--accent-hue) / 0.08);
+  --shadow:
+    0 2px 6px 0 oklch(0.34 0.05 var(--accent-hue) / 0.1),
+    0 1px 3px -1px oklch(0.34 0.05 var(--accent-hue) / 0.08);
+  --shadow-md:
+    0 4px 8px -1px oklch(0.33 0.055 var(--accent-hue) / 0.11),
+    0 2px 4px -2px oklch(0.33 0.055 var(--accent-hue) / 0.08);
+  --shadow-lg:
+    0 8px 16px -2px oklch(0.32 0.06 var(--accent-hue) / 0.12),
+    0 4px 6px -3px oklch(0.32 0.06 var(--accent-hue) / 0.09);
+  --shadow-xl:
+    0 16px 32px -4px oklch(0.31 0.065 var(--accent-hue) / 0.14),
+    0 8px 12px -6px oklch(0.31 0.065 var(--accent-hue) / 0.1);
+  --shadow-2xl: 0 24px 48px -8px oklch(0.3 0.07 var(--accent-hue) / 0.2);
+  --tracking-normal: 0rem;
+  --spacing: 0.25rem;
+}
+
+/*
+ * Dark mode — one-line invert of the entire light palette.
+ *
+ * `invert(1) hue-rotate(180deg)` flips luminance while keeping the blue
+ * Slack-Ochin accent blue (the rotate cancels invert's hue flip). A full
+ * `invert(1)` is used — not a partial — because only a full invert is
+ * exactly self-inverse, which is what lets opted-out elements restore
+ * perfectly. To avoid harsh pure black, `contrast(var(--dark-contrast))`
+ * then lifts the extremes toward grey (black → soft charcoal, white →
+ * off-white). Tune the whole dark UI from the single `--dark-contrast`
+ * knob in `:root`. `contrast()` is exactly invertible (`contrast(1/c)`),
+ * so the chain stays losslessly reversible.
+ *
+ * Applied to `html` (not `body`) so it does not create a containing
+ * block that would break `position: fixed`.
+ *
+ * Anything that should keep its true colors in dark mode — brand logos,
+ * the nimbus mascot, photos, screenshots, or media drawn to a
+ * <canvas>/<video> — opts out with `data-keep-color`, which applies the
+ * exact mathematical inverse of the chain above (reverse order: undo
+ * contrast, re-rotate hue 180°, undo invert). The filter on that element
+ * already covers its whole subtree, so we deliberately do NOT also match
+ * descendants — doing so double-applied the restore and corrupted
+ * multi-element SVGs.
+ */
+html.dark {
+  filter: invert(1) hue-rotate(180deg) contrast(var(--dark-contrast));
+}
+
+html.dark [data-keep-color] {
+  filter: contrast(calc(1 / var(--dark-contrast))) hue-rotate(180deg) invert(1);
+}
+
+/* Accent presets — only --accent-hue varies; all other tokens cascade through it. */
+:root[data-accent="cyan"] {
+  --accent-hue: 200;
+}
+:root[data-accent="green"] {
+  --accent-hue: 150;
+}
+:root[data-accent="purple"] {
+  --accent-hue: 290;
+}
+:root[data-accent="rose"] {
+  --accent-hue: 350;
+}
+:root[data-accent="orange"] {
+  --accent-hue: 55;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@theme inline {
+  --animate-float: float 3s ease-in-out infinite;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-app-sans);
+  --font-mono: var(--font-app-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
+  --tracking-tight: calc(var(--tracking-normal) - 0.025em);
+  --tracking-normal: var(--tracking-normal);
+  --tracking-wide: calc(var(--tracking-normal) + 0.025em);
+  --tracking-wider: calc(var(--tracking-normal) + 0.05em);
+  --tracking-widest: calc(var(--tracking-normal) + 0.1em);
+}

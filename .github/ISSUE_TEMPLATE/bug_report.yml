@@ -1,0 +1,41 @@
+name: Bug report
+description: Create a bug report to help us improve
+title: "bug: "
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Provide environment information
+      description: |
+        Run this command in your project root and paste the results in a code block:
+        ```bash
+        npx envinfo --system --binaries
+        ```
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of the bug, as well as what you expected to happen when encountering it.
+    validations:
+      required: true
+  - type: input
+    id: reproduction
+    attributes:
+      label: Link to reproduction
+      description: Please provide a minimal reproduction when one is practical.
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: To reproduce
+      description: Describe how to reproduce your bug. Steps, code snippets, reproduction repos etc.
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional information
+      description: Add any other information related to the bug here, screenshots if applicable.
