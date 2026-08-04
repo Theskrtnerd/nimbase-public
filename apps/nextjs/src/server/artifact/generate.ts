@@ -1,18 +1,17 @@
 import "server-only";
 
-import { generateText, isStepCount } from "ai";
+import { generateText } from "ai";
 
 import type { ArtifactGenerateJobData } from "@acme/cloud";
 import { costFor, resolveModels, s3, traceGeneration } from "@acme/cloud";
 import {
   buildHarnessMounts,
-  harnessEnabledFor,
   kbSearchTool,
   resolveHarnessModel,
   runHarnessAgent,
   WikiFileSystem,
 } from "@acme/cloud/harness";
-import { readTools, WikiReadFs } from "@acme/cloud/memory/wiki";
+import { WikiReadFs } from "@acme/cloud/memory/wiki";
 import { and, eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Artifact, SpendLedger } from "@acme/db/schema";
@@ -31,14 +30,9 @@ import {
   buildArtifactArtifact,
 } from "./build-artifact";
 
-// Bound the agentic exploration. The Claude call dominates; these caps sit well
-// inside the route's 300s ceiling.
-const ARTIFACT_MAX_STEPS = 12;
-const ARTIFACT_MAX_TOTAL_TOKENS = 100_000;
-// A full artifact component routinely runs 400+ lines. At 8k the model was
-// hitting the ceiling mid-expression and the truncated file failed to parse as
-// a bogus "transpile_failed" syntax error.
-const ARTIFACT_MAX_OUTPUT_TOKENS = 16_000;
+// A repaired artifact can still run 400+ lines. Keep enough room to replace a
+// truncated first attempt without cutting the repair off at the same seam.
+const ARTIFACT_REPAIR_MAX_OUTPUT_TOKENS = 16_000;
 // How many times the model gets to see its own build error and try again. Two
 // is enough for a syntax slip or a truncation retry; beyond that the prompt is
 // usually asking for something the sandbox can't express.
@@ -48,11 +42,11 @@ const ARTIFACT_MAX_REPAIR_ATTEMPTS = 2;
 const ARTIFACT_HARNESS_TIMEOUT_MS = 240_000;
 
 /**
- * The artifact generation job: run an agentic loop with read-only KB tools fenced
- * to the creator/deployment's snapshotted read scopes, take the final message as the artifact,
- * build/upload it, then flip the Artifact row to "draft". On any failure the row
- * is marked "failed" (keeping a previous artifact, if one exists, intact) and
- * the error is rethrown so QStash retries.
+ * The artifact generation job: run the artifact harness with a read-only KB
+ * fenced to the creator/deployment's snapshotted read scopes, read its output
+ * file (or final message fallback), build/upload it, then flip the Artifact row
+ * to "draft". On any failure the row is marked "failed" (keeping a previous
+ * artifact, if one exists, intact) and the error is rethrown so QStash retries.
  */
 export async function processArtifactGenerateJob(
   data: ArtifactGenerateJobData,
@@ -69,86 +63,40 @@ export async function processArtifactGenerateJob(
     }\n\n${ARTIFACT_KB_GUIDANCE}`;
     const userPrompt = `${data.prompt ?? "Create a clean interface."}\n\n${themeInstruction(data.themeMode, data.themeDescription)}`;
 
-    let raw: string;
-    let modelIdForCost: string;
-    let usage: { inputTokens: number; outputTokens: number };
-    // Whether the first attempt ran out of output budget rather than finishing.
-    // The repair turn needs to know: a truncated file needs to be made shorter,
-    // not syntactically patched at the seam.
-    let truncated = false;
-
-    if (harnessEnabledFor("artifact")) {
-      // Pi-harness runner: the KB is the sandbox filesystem (read-only at
-      // /wiki) and the artifact is a file the agent writes to /output, read
-      // back after the turn (final message text as fallback).
-      const wikiFs = WikiFileSystem.readOnly(
-        new WikiReadFs(workspaceId, readScopes),
-      );
-      await wikiFs.prime();
-      const mounts = buildHarnessMounts(wikiFs);
-      const model = await resolveHarnessModel(workspaceId);
-      const outputPath =
-        data.kind === "fixed"
-          ? "/output/artifact.tsx"
-          : "/output/artifact.html";
-      const run = await runHarnessAgent({
-        agent: "artifact",
-        fs: mounts.fs,
-        model,
-        tools: kbSearchTool({
-          workspaceId,
-          scopes: readScopes ?? undefined,
-        }),
-        prompt: `Output mode: ${data.kind} — write the artifact to ${outputPath}.\n\n${userPrompt}`,
-        timeoutMs: ARTIFACT_HARNESS_TIMEOUT_MS,
-        trace: {
-          name: "artifact-generate",
-          workspaceId,
-          metadata: { artifactId, kind: data.kind },
-        },
-      });
-      raw = stripCodeFence((await mounts.readOutput(outputPath)) ?? run.text);
-      modelIdForCost = model.modelId;
-      usage = run.usage;
-    } else {
-      const fs = new WikiReadFs(workspaceId, readScopes);
-      const tools = readTools(fs, {
+    // Pi-harness runner: the KB is the sandbox filesystem (read-only at /wiki)
+    // and the artifact is a file the agent writes to /output, read back after
+    // the turn (final message text as fallback).
+    const wikiFs = WikiFileSystem.readOnly(
+      new WikiReadFs(workspaceId, readScopes),
+    );
+    await wikiFs.prime();
+    const mounts = buildHarnessMounts(wikiFs);
+    const model = await resolveHarnessModel(workspaceId);
+    const outputPath =
+      data.kind === "fixed" ? "/output/artifact.tsx" : "/output/artifact.html";
+    const run = await runHarnessAgent({
+      agent: "artifact",
+      fs: mounts.fs,
+      model,
+      tools: kbSearchTool({
         workspaceId,
         scopes: readScopes ?? undefined,
-      });
-      const { chat } = await resolveModels(workspaceId);
-      const result = await traceGeneration(
-        {
-          name: "artifact-generate",
-          workspaceId,
-          role: "chat",
-          modelId: chat.id,
-          input: userPrompt,
-          metadata: { artifactId, kind: data.kind },
-        },
-        () =>
-          generateText({
-            model: chat.model,
-            instructions,
-            prompt: userPrompt,
-            tools,
-            maxOutputTokens: ARTIFACT_MAX_OUTPUT_TOKENS,
-            stopWhen: [
-              isStepCount(ARTIFACT_MAX_STEPS),
-              ({ steps }) =>
-                steps.reduce((n, s) => n + (s.usage.totalTokens ?? 0), 0) >
-                ARTIFACT_MAX_TOTAL_TOKENS,
-            ],
-          }),
-      );
-      raw = stripCodeFence(result.text);
-      truncated = result.finishReason === "length";
-      modelIdForCost = chat.id;
-      usage = {
-        inputTokens: result.totalUsage.inputTokens ?? 0,
-        outputTokens: result.totalUsage.outputTokens ?? 0,
-      };
-    }
+      }),
+      prompt: `Output mode: ${data.kind} — write the artifact to ${outputPath}.\n\n${userPrompt}`,
+      timeoutMs: ARTIFACT_HARNESS_TIMEOUT_MS,
+      trace: {
+        name: "artifact-generate",
+        workspaceId,
+        metadata: { artifactId, kind: data.kind },
+      },
+    });
+    let raw = stripCodeFence((await mounts.readOutput(outputPath)) ?? run.text);
+    const modelIdForCost = model.modelId;
+    const usage = run.usage;
+    // Pi does not expose a first-turn finish reason through the harness result.
+    // Repair calls below do, so subsequent attempts can distinguish truncation
+    // from a syntax error at the seam.
+    let truncated = false;
 
     if (!raw.trim()) {
       throw new Error(
@@ -193,7 +141,7 @@ export async function processArtifactGenerateJob(
                 error: err,
                 truncated,
               }),
-              maxOutputTokens: ARTIFACT_MAX_OUTPUT_TOKENS,
+              maxOutputTokens: ARTIFACT_REPAIR_MAX_OUTPUT_TOKENS,
             }),
         );
         raw = stripCodeFence(repair.text);

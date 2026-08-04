@@ -13,12 +13,9 @@ import { WikiFileSystem } from "./wiki-file-system";
 
 const GARDENER_TIMEOUT_MS = 240_000;
 
-// Harness twin of runGardener (same inputs minus the pre-resolved model, same
-// GardenerResult contract including recorded ops), selected by the
-// NIMBASE_HARNESS_SURFACES=gardener flag in wiki-pg-provider.reconcile. The
-// wiki is the sandbox filesystem, so Pi's built-in file tools (and bash) edit
-// notes directly through the fenced GardenerFs; domain metadata stays on
-// custom tools.
+// The compile gardener. The wiki is the sandbox filesystem, so Pi's built-in
+// file tools (and bash) edit notes directly through the fenced GardenerFs;
+// domain metadata stays on custom tools.
 export async function runGardenerHarness(args: {
   workspaceId: string;
   sourceId: string;
@@ -28,7 +25,7 @@ export async function runGardenerHarness(args: {
   rawText: string;
   fence: PathScope;
   // Standing company context (company.md, tended by the Biographer) — same
-  // injection as the legacy runner; null for workspaces without one.
+  // injection used by every compile; null for workspaces without one.
   companyContext?: string | null;
 }): Promise<GardenerResult> {
   const gardenerFs = new GardenerFs(

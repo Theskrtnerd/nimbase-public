@@ -1,6 +1,5 @@
 import "server-only";
 
-import { isStepCount, streamText } from "ai";
 import { toAiMessages } from "chat/ai";
 
 import type { AgentTurnJobData } from "@acme/cloud";
@@ -9,7 +8,6 @@ import { resolveAgentScopes } from "@acme/api/access";
 import { costFor } from "@acme/cloud";
 import {
   buildHarnessMounts,
-  harnessEnabledFor,
   kbSearchTool,
   resolveHarnessModel,
   runHarnessAgent,
@@ -33,11 +31,6 @@ import { getBotRuntime } from "./bot";
 import { postAttachments } from "./post-attachments";
 import { parseSlackSecrets } from "./secrets";
 import { createTurnStatus, TURN_STATUS, withToolStatus } from "./status";
-import {
-  AGENT_MAX_STEPS,
-  AGENT_MAX_TOTAL_TOKENS,
-  assembleKbTurn,
-} from "./turn";
 
 // Wall-clock cap for harness turns (Pi owns its inner step loop).
 const CHAT_HARNESS_TIMEOUT_MS = 120_000;
@@ -83,9 +76,9 @@ async function withConnection<T>(
 }
 
 // Run one inbound turn: cap-check, answer from the agent's fenced KB (using the
-// platform thread for context), stream the reply back through Chat SDK, and
-// append to the turn log. Caps reuse the turn log + spend ledger. Over a cap,
-// the turn is silently dropped.
+// platform thread for context), post the reply through Chat SDK, and append to
+// the turn log. Caps reuse the turn log + spend ledger. Over a cap, the turn is
+// silently dropped.
 export async function processAgentTurn(data: AgentTurnJobData): Promise<void> {
   const [conn] = await db
     .select()
@@ -135,9 +128,8 @@ export async function processAgentTurn(data: AgentTurnJobData): Promise<void> {
   const scopes = await resolveAgentScopes(agent.id, agent.workspaceId);
 
   // The agent's only write capability, off unless a manager turned it on. It is
-  // built here (not inside assembleKbTurn) because that assembler is shared with
-  // the public widget chat — artifact authoring must never reach an anonymous web
-  // visitor. The generator is fenced to `scopes`, so a artifact can never read
+  // built here because artifact authoring must never reach an anonymous web
+  // visitor. The generator is fenced to `scopes`, so an artifact can never read
   // more of the wiki than the agent itself.
   // Gated on declared file-upload support rather than assumed: a platform that
   // can't take bytes must get no sink, because withholding it is what collapses
@@ -158,7 +150,7 @@ export async function processAgentTurn(data: AgentTurnJobData): Promise<void> {
   const artifactInstructions = agent.artifactEnabled
     ? `When the user asks for an analysis, report, dashboard, or anything better shown than told, build it with create_artifact and reply with the link it returns. Gather the facts from the wiki first and put them in the artifact prompt. For a plain question, just answer — don't build a page. ${BARE_LINK_RULE}`
     : null;
-  // A artifact call can block for up to 90s while it builds; the default ceiling
+  // An artifact call can block while it builds; the default ceiling
   // would cut the turn off mid-tool.
   const harnessTimeoutMs = agent.artifactEnabled
     ? CHAT_HARNESS_ARTIFACT_TIMEOUT_MS
@@ -190,102 +182,58 @@ export async function processAgentTurn(data: AgentTurnJobData): Promise<void> {
         : [{ role: "user" as const, content: data.userText }];
 
       try {
-        if (harnessEnabledFor("chat")) {
-          // Pi-harness runner: read-only wiki mounted at /wiki, thread history
-          // flattened into the single prompt (Pi takes one prompt per fresh
-          // session; the platform thread is re-fetched every turn anyway).
-          const wikiFs = WikiFileSystem.readOnly(
-            new WikiReadFs(agent.workspaceId, scopes),
-          );
-          await wikiFs.prime();
-          const mounts = buildHarnessMounts(wikiFs);
-          const model = await resolveHarnessModel(agent.workspaceId);
-          const kbTools = {
-            ...kbSearchTool({
-              workspaceId: agent.workspaceId,
-              scopes,
-            }),
-            ...artifactTools,
-          };
-          const transcript = messages
-            .map((m) => {
-              const body =
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content);
-              return `${m.role === "user" ? "User" : "Assistant"}: ${body}`;
-            })
-            .join("\n\n");
-          const run = await runHarnessAgent({
-            agent: "chat",
-            fs: mounts.fs,
-            model,
-            // Only the host-executed tools report status; the harness's
-            // built-in file ops run inside Pi's opaque loop, so those steps
-            // read as "Thinking…".
-            tools: withToolStatus(kbTools, status),
-            instructionsExtra: [
-              agent.instructions.trim() || null,
-              ...(artifactInstructions ? [artifactInstructions] : []),
-            ],
-            prompt: `<conversation>\n${transcript}\n</conversation>\n\nReply to the last user message.`,
-            timeoutMs: harnessTimeoutMs,
-            trace: {
-              name: "agent-turn",
-              workspaceId: agent.workspaceId,
-              metadata: { agentId: agent.id, connectionId: conn.id },
-            },
-          });
-          // Pi returns a finished string rather than a stream, so this path
-          // still posts once at the end.
-          const answer = run.text.trim() || FALLBACK;
-          await thread.post(answer);
-          await postAttachments(thread, attachments);
-          return {
-            answer,
-            tokens: run.usage.inputTokens + run.usage.outputTokens,
-            cents: costFor(model.modelId, run.usage),
-            error: null,
-          };
-        }
-
-        const assembled = await assembleKbTurn({
-          workspaceId: agent.workspaceId,
-          scopes,
-          instructions: [agent.instructions, artifactInstructions]
-            .filter(Boolean)
-            .join("\n\n"),
-        });
-        const result = streamText({
-          model: assembled.model,
-          instructions: assembled.instructions,
-          tools: withToolStatus(
-            { ...assembled.tools, ...artifactTools },
-            status,
-          ),
-          maxOutputTokens: assembled.maxOutputTokens,
-          messages,
-          stopWhen: [
-            isStepCount(AGENT_MAX_STEPS),
-            ({ steps }) =>
-              steps.reduce((n, s) => n + (s.usage.totalTokens ?? 0), 0) >
-              AGENT_MAX_TOTAL_TOKENS,
-          ],
-        });
-        // Slack renders this through its native streaming API, so the answer
-        // appears progressively instead of landing as one late message. Chat
-        // SDK also converts the model's markdown to each platform's dialect
-        // (Slack mrkdwn), which the old raw-text post did not.
-        await thread.post(result.fullStream);
-        await postAttachments(thread, attachments);
-        const usage = await result.totalUsage;
-        return {
-          answer: (await result.text).trim() || FALLBACK,
-          tokens: usage.totalTokens ?? 0,
-          cents: costFor(assembled.modelId, {
-            inputTokens: usage.inputTokens ?? 0,
-            outputTokens: usage.outputTokens ?? 0,
+        // Pi-harness runner: read-only wiki mounted at /wiki, thread history
+        // flattened into the single prompt (Pi takes one prompt per fresh
+        // session; the platform thread is re-fetched every turn anyway).
+        const wikiFs = WikiFileSystem.readOnly(
+          new WikiReadFs(agent.workspaceId, scopes),
+        );
+        await wikiFs.prime();
+        const mounts = buildHarnessMounts(wikiFs);
+        const model = await resolveHarnessModel(agent.workspaceId);
+        const kbTools = {
+          ...kbSearchTool({
+            workspaceId: agent.workspaceId,
+            scopes,
           }),
+          ...artifactTools,
+        };
+        const transcript = messages
+          .map((m) => {
+            const body =
+              typeof m.content === "string"
+                ? m.content
+                : JSON.stringify(m.content);
+            return `${m.role === "user" ? "User" : "Assistant"}: ${body}`;
+          })
+          .join("\n\n");
+        const run = await runHarnessAgent({
+          agent: "chat",
+          fs: mounts.fs,
+          model,
+          // Only the host-executed tools report status; the harness's built-in
+          // file ops run inside Pi's opaque loop, so those steps read as
+          // "Thinking…".
+          tools: withToolStatus(kbTools, status),
+          instructionsExtra: [
+            agent.instructions.trim() || null,
+            ...(artifactInstructions ? [artifactInstructions] : []),
+          ],
+          prompt: `<conversation>\n${transcript}\n</conversation>\n\nReply to the last user message.`,
+          timeoutMs: harnessTimeoutMs,
+          trace: {
+            name: "agent-turn",
+            workspaceId: agent.workspaceId,
+            metadata: { agentId: agent.id, connectionId: conn.id },
+          },
+        });
+        const answer = run.text.trim() || FALLBACK;
+        await thread.post(answer);
+        await postAttachments(thread, attachments);
+        return {
+          answer,
+          tokens: run.usage.inputTokens + run.usage.outputTokens,
+          cents: costFor(model.modelId, run.usage),
           error: null,
         };
       } catch (err) {

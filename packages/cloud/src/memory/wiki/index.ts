@@ -13,6 +13,6 @@ export type {
   WikiEntry,
 } from "./vfs";
 export { readTools, vfsCall } from "./vfs-read-tools";
-export { GardenerError, runGardener } from "./gardener";
+export { GardenerError } from "./gardener";
 export type { GardenerResult } from "./gardener";
 export { normalizeTitle } from "../okf/normalize";

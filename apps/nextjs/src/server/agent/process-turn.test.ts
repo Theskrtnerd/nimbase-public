@@ -5,8 +5,6 @@ import { processAgentTurn } from "./process-turn";
 const mocks = vi.hoisted(() => ({
   selectResults: [] as unknown[],
   insertValues: vi.fn(),
-  streamText: vi.fn(),
-  harnessEnabledFor: vi.fn(() => false),
   runHarnessAgent: vi.fn(),
   prime: vi.fn(),
   fetchMessages: vi.fn(),
@@ -14,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   post: vi.fn(),
   startTyping: vi.fn(),
   withBotToken: vi.fn(),
-  assembleKbTurn: vi.fn(),
   resolveAgentScopes: vi.fn(),
   agentArtifactTools: vi.fn(() => ({ create_artifact: { execute: vi.fn() } })),
 }));
@@ -56,7 +53,6 @@ vi.mock("@acme/cloud", () => ({
     Math.round((u.inputTokens * 300 + u.outputTokens * 1500) / 1_000_000),
 }));
 vi.mock("@acme/cloud/harness", () => ({
-  harnessEnabledFor: mocks.harnessEnabledFor,
   runHarnessAgent: mocks.runHarnessAgent,
   buildHarnessMounts: () => ({ fs: {}, readOutput: vi.fn() }),
   kbSearchTool: () => ({ search: {} }),
@@ -65,10 +61,6 @@ vi.mock("@acme/cloud/harness", () => ({
   WikiFileSystem: { readOnly: () => ({ prime: mocks.prime }) },
 }));
 vi.mock("@acme/cloud/memory/wiki", () => ({ WikiReadFs: class {} }));
-vi.mock("ai", () => ({
-  streamText: mocks.streamText,
-  isStepCount: () => ({}),
-}));
 vi.mock("chat/ai", () => ({ toAiMessages: mocks.toAiMessages }));
 vi.mock("./bot", () => ({
   getBotRuntime: () => ({
@@ -101,11 +93,6 @@ vi.mock("./secrets", () => ({
 }));
 vi.mock("../connection-secret", () => ({
   decryptConnectionSecret: () => JSON.stringify({ botToken: "xoxb-1" }),
-}));
-vi.mock("./turn", () => ({
-  AGENT_MAX_STEPS: 8,
-  AGENT_MAX_TOTAL_TOKENS: 60_000,
-  assembleKbTurn: mocks.assembleKbTurn,
 }));
 
 const JOB = {
@@ -169,7 +156,6 @@ beforeEach(() => {
 describe("processAgentTurn (Pi harness path)", () => {
   beforeEach(() => {
     queueHappyPathSelects();
-    mocks.harnessEnabledFor.mockReturnValue(true);
     mocks.runHarnessAgent.mockResolvedValue({
       text: "See team/onboarding.md",
       usage: { inputTokens: 1000, outputTokens: 2000 },
@@ -179,8 +165,6 @@ describe("processAgentTurn (Pi harness path)", () => {
   it("answers through the harness with the flattened transcript and persona", async () => {
     await processAgentTurn(JOB);
 
-    expect(mocks.streamText).not.toHaveBeenCalled();
-    expect(mocks.assembleKbTurn).not.toHaveBeenCalled();
     expect(mocks.prime).toHaveBeenCalled();
 
     const call = mocks.runHarnessAgent.mock.calls[0]?.[0] as {
@@ -244,53 +228,6 @@ describe("processAgentTurn (Pi harness path)", () => {
   });
 });
 
-describe("processAgentTurn (streaming path)", () => {
-  beforeEach(() => {
-    queueHappyPathSelects();
-    mocks.harnessEnabledFor.mockReturnValue(false);
-    mocks.assembleKbTurn.mockResolvedValue({
-      model: "m",
-      modelId: "anthropic/claude-sonnet-4.6",
-      instructions: "sys",
-      tools: {},
-      maxOutputTokens: 1500,
-    });
-    mocks.streamText.mockReturnValue({
-      fullStream: "stream-handle",
-      text: Promise.resolve("legacy answer"),
-      totalUsage: Promise.resolve({
-        inputTokens: 1,
-        outputTokens: 2,
-        totalTokens: 3,
-      }),
-    });
-  });
-
-  it("streams the reply into the thread instead of posting once at the end", async () => {
-    await processAgentTurn(JOB);
-
-    expect(mocks.runHarnessAgent).not.toHaveBeenCalled();
-    // The stream itself is handed to Chat SDK, which renders it natively.
-    expect(mocks.post).toHaveBeenCalledWith("stream-handle");
-    expect(mocks.insertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        answer: "legacy answer",
-        tokens: 3,
-        error: null,
-      }),
-    );
-  });
-
-  it("passes the platform thread history to the model", async () => {
-    await processAgentTurn(JOB);
-
-    const call = mocks.streamText.mock.calls[0]?.[0] as {
-      messages: { role: string }[];
-    };
-    expect(call.messages).toHaveLength(3);
-  });
-});
-
 describe("processAgentTurn (caps)", () => {
   it("drops the turn when the connection is over its rate window", async () => {
     mocks.selectResults.push(
@@ -346,9 +283,8 @@ describe("processAgentTurn (caps)", () => {
   });
 });
 
-// Artifact authoring is the agent's only write capability and it publishes a link
-// that can be readable without a Nimbase session, so the flag is the whole
-// safety boundary — these assert it is honoured on both execution paths.
+// Artifact authoring is the agent's only write capability and can publish a link
+// readable without a Nimbase session, so these tests guard its per-agent gate.
 describe("processAgentTurn (artifact tool gating)", () => {
   const artifactAgent = {
     artifactEnabled: true,
@@ -356,22 +292,6 @@ describe("processAgentTurn (artifact tool gating)", () => {
   };
 
   beforeEach(() => {
-    mocks.assembleKbTurn.mockResolvedValue({
-      model: "m",
-      modelId: "anthropic/claude-sonnet-4.6",
-      instructions: "sys",
-      tools: { search: { execute: vi.fn() } },
-      maxOutputTokens: 1500,
-    });
-    mocks.streamText.mockReturnValue({
-      fullStream: "stream-handle",
-      text: Promise.resolve("answer"),
-      totalUsage: Promise.resolve({
-        inputTokens: 1,
-        outputTokens: 2,
-        totalTokens: 3,
-      }),
-    });
     mocks.runHarnessAgent.mockResolvedValue({
       text: "answer",
       usage: { inputTokens: 1, outputTokens: 2 },
@@ -380,35 +300,31 @@ describe("processAgentTurn (artifact tool gating)", () => {
 
   it("withholds the artifact tool when the agent has it disabled", async () => {
     queueHappyPathSelects();
-    mocks.harnessEnabledFor.mockReturnValue(false);
 
     await processAgentTurn(JOB);
 
     expect(mocks.agentArtifactTools).not.toHaveBeenCalled();
-    const call = mocks.streamText.mock.calls[0]?.[0] as {
+    const call = mocks.runHarnessAgent.mock.calls[0]?.[0] as {
       tools: Record<string, unknown>;
     };
     expect(Object.keys(call.tools)).not.toContain("create_artifact");
   });
 
-  it("adds the artifact tool on the streaming path when enabled", async () => {
+  it("adds the artifact tool when enabled without dropping KB search", async () => {
     queueHappyPathSelects("slack", artifactAgent);
-    mocks.harnessEnabledFor.mockReturnValue(false);
 
     await processAgentTurn(JOB);
 
-    const call = mocks.streamText.mock.calls[0]?.[0] as {
+    const call = mocks.runHarnessAgent.mock.calls[0]?.[0] as {
       tools: Record<string, unknown>;
-      instructions: string;
     };
     expect(Object.keys(call.tools)).toContain("create_artifact");
     // The KB read tools survive the merge.
     expect(Object.keys(call.tools)).toContain("search");
   });
 
-  it("adds the artifact tool on the harness path when enabled", async () => {
+  it("extends the harness timeout when the artifact tool is enabled", async () => {
     queueHappyPathSelects("slack", artifactAgent);
-    mocks.harnessEnabledFor.mockReturnValue(true);
 
     await processAgentTurn(JOB);
 
@@ -423,7 +339,6 @@ describe("processAgentTurn (artifact tool gating)", () => {
 
   it("fences the artifact generator to the agent's own scopes and anchor", async () => {
     queueHappyPathSelects("slack", artifactAgent);
-    mocks.harnessEnabledFor.mockReturnValue(false);
 
     await processAgentTurn(JOB);
 
@@ -454,7 +369,6 @@ describe("processAgentTurn (artifact tool gating)", () => {
   // the branch for whichever platform lands next.
   it("gives the artifact tool no attachment sink on a platform without uploads", async () => {
     queueHappyPathSelects("teams", artifactAgent);
-    mocks.harnessEnabledFor.mockReturnValue(false);
 
     await processAgentTurn(JOB);
 

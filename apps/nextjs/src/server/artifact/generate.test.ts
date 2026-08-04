@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   buildArtifactHtml: vi.fn(),
   hasUnsafeScript: vi.fn(),
   putObject: vi.fn(),
-  harnessEnabledFor: vi.fn(() => false),
   runHarnessAgent: vi.fn(),
   readOutput: vi.fn(),
   prime: vi.fn(),
@@ -20,8 +19,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("ai", () => ({
   generateText: mocks.generateText,
-  isStepCount: () => ({}),
-  tool: (def: unknown) => def,
 }));
 vi.mock("@acme/db", () => ({ and: vi.fn(), eq: vi.fn() }));
 vi.mock("@acme/db/schema", () => ({ Artifact: {}, SpendLedger: {} }));
@@ -65,10 +62,8 @@ vi.mock("@acme/cloud", () => ({
 }));
 vi.mock("@acme/cloud/memory/wiki", () => ({
   WikiReadFs: class {},
-  readTools: () => ({}),
 }));
 vi.mock("@acme/cloud/harness", () => ({
-  harnessEnabledFor: mocks.harnessEnabledFor,
   runHarnessAgent: mocks.runHarnessAgent,
   buildHarnessMounts: () => ({ fs: {}, readOutput: mocks.readOutput }),
   kbSearchTool: () => ({ search: {} }),
@@ -107,10 +102,14 @@ describe("processArtifactGenerateJob", () => {
     mocks.updateSet.mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
     mocks.insertValues.mockResolvedValue([]);
     mocks.putObject.mockResolvedValue(undefined);
+    mocks.runHarnessAgent.mockResolvedValue({
+      text: "fallback text",
+      usage: { inputTokens: 1000, outputTokens: 2000 },
+    });
   });
 
   it("freeform success: uploads html, marks draft, records spend", async () => {
-    mocks.generateText.mockResolvedValue(genReply("<html>ok</html>"));
+    mocks.readOutput.mockResolvedValue("<html>ok</html>");
     mocks.hasUnsafeScript.mockReturnValue(false);
 
     await processArtifactGenerateJob({ ...base, kind: "freeform" });
@@ -138,10 +137,8 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("freeform: injects the mermaid loader only when a diagram is present", async () => {
-    mocks.generateText.mockResolvedValue(
-      genReply(
-        `<html><head></head><body><pre class="mermaid">graph TD; A-->B;</pre></body></html>`,
-      ),
+    mocks.readOutput.mockResolvedValue(
+      `<html><head></head><body><pre class="mermaid">graph TD; A-->B;</pre></body></html>`,
     );
     mocks.hasUnsafeScript.mockReturnValue(false);
 
@@ -155,8 +152,8 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("freeform: leaves a diagram-free document without the mermaid loader", async () => {
-    mocks.generateText.mockResolvedValue(
-      genReply("<html><head></head><body>plain</body></html>"),
+    mocks.readOutput.mockResolvedValue(
+      "<html><head></head><body>plain</body></html>",
     );
     mocks.hasUnsafeScript.mockReturnValue(false);
 
@@ -172,6 +169,7 @@ describe("processArtifactGenerateJob", () => {
   // The sanitizer runs on raw model output, before injection — so a model that
   // tries to write its own script tag is still rejected.
   it("freeform with unsafe script: marks failed and rethrows", async () => {
+    mocks.readOutput.mockResolvedValue("<html>bad</html>");
     mocks.generateText.mockResolvedValue(genReply("<html>bad</html>"));
     mocks.hasUnsafeScript.mockReturnValue(true);
 
@@ -189,7 +187,11 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("empty model output: marks failed and rethrows", async () => {
-    mocks.generateText.mockResolvedValue(genReply("   "));
+    mocks.readOutput.mockResolvedValue(null);
+    mocks.runHarnessAgent.mockResolvedValue({
+      text: "   ",
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
 
     await expect(
       processArtifactGenerateJob({ ...base, kind: "fixed" }),
@@ -202,6 +204,7 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("fixed transpile failure: marks failed and rethrows after exhausting repairs", async () => {
+    mocks.readOutput.mockResolvedValue("export default x");
     mocks.generateText.mockResolvedValue(genReply("export default x"));
     mocks.buildArtifactHtml.mockImplementation(() => {
       throw new Error("Unexpected token");
@@ -211,8 +214,8 @@ describe("processArtifactGenerateJob", () => {
       processArtifactGenerateJob({ ...base, kind: "fixed" }),
     ).rejects.toThrow("transpile_failed");
 
-    // One generation + ARTIFACT_MAX_REPAIR_ATTEMPTS repairs, then it gives up.
-    expect(mocks.generateText).toHaveBeenCalledTimes(3);
+    expect(mocks.runHarnessAgent).toHaveBeenCalledTimes(1);
+    expect(mocks.generateText).toHaveBeenCalledTimes(2);
     expect(mocks.updateSet).toHaveBeenCalledWith(
       expect.objectContaining({ status: "failed" }),
     );
@@ -220,9 +223,8 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("fixed transpile failure: repairs from the build error and succeeds", async () => {
-    mocks.generateText
-      .mockResolvedValueOnce(genReply("export default broken"))
-      .mockResolvedValueOnce(genReply("export default fixed"));
+    mocks.readOutput.mockResolvedValue("export default broken");
+    mocks.generateText.mockResolvedValueOnce(genReply("export default fixed"));
     mocks.buildArtifactHtml
       .mockImplementationOnce(() => {
         throw new Error("Unexpected token (455:12)");
@@ -233,7 +235,7 @@ describe("processArtifactGenerateJob", () => {
 
     // The repair turn is tool-free and must show the model both the compiler
     // error and the source it indexes into.
-    const repairCall = mocks.generateText.mock.calls[1]?.[0] as {
+    const repairCall = mocks.generateText.mock.calls[0]?.[0] as {
       prompt: string;
       tools?: unknown;
     };
@@ -262,9 +264,8 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("freeform unsafe script: a repaired document is accepted", async () => {
-    mocks.generateText
-      .mockResolvedValueOnce(genReply("<html><script>bad</script></html>"))
-      .mockResolvedValueOnce(genReply("<html>clean</html>"));
+    mocks.readOutput.mockResolvedValue("<html><script>bad</script></html>");
+    mocks.generateText.mockResolvedValueOnce(genReply("<html>clean</html>"));
     mocks.hasUnsafeScript.mockReturnValueOnce(true).mockReturnValueOnce(false);
 
     await processArtifactGenerateJob({ ...base, kind: "freeform" });
@@ -280,9 +281,8 @@ describe("processArtifactGenerateJob", () => {
   });
 
   it("gives up rather than repairing when the model returns nothing", async () => {
-    mocks.generateText
-      .mockResolvedValueOnce(genReply("export default broken"))
-      .mockResolvedValueOnce(genReply("   "));
+    mocks.readOutput.mockResolvedValue("export default broken");
+    mocks.generateText.mockResolvedValueOnce(genReply("   "));
     mocks.buildArtifactHtml.mockImplementation(() => {
       throw new Error("Unexpected token");
     });
@@ -293,32 +293,11 @@ describe("processArtifactGenerateJob", () => {
 
     // An empty repair ends the loop immediately — retrying on nothing would
     // just burn the remaining attempt on the same empty prompt.
-    expect(mocks.generateText).toHaveBeenCalledTimes(2);
-  });
-
-  it("tells a truncated first attempt to shorten, not just fix syntax", async () => {
-    mocks.generateText
-      .mockResolvedValueOnce({
-        ...genReply("export default truncated"),
-        finishReason: "length",
-      })
-      .mockResolvedValueOnce(genReply("export default fixed"));
-    mocks.buildArtifactHtml
-      .mockImplementationOnce(() => {
-        throw new Error("Unexpected token (455:12)");
-      })
-      .mockReturnValueOnce("<!doctype html>ok");
-
-    await processArtifactGenerateJob({ ...base, kind: "fixed" });
-
-    const repairCall = mocks.generateText.mock.calls[1]?.[0] as {
-      prompt: string;
-    };
-    expect(repairCall.prompt).toContain("cut off at the output-token limit");
+    expect(mocks.generateText).toHaveBeenCalledTimes(1);
   });
 
   it("fixed success: uploads html and tsx source", async () => {
-    mocks.generateText.mockResolvedValue(genReply("export default fn"));
+    mocks.readOutput.mockResolvedValue("export default fn");
     mocks.buildArtifactHtml.mockReturnValue("<html>built</html>");
 
     await processArtifactGenerateJob({ ...base, kind: "fixed" });
@@ -337,10 +316,9 @@ describe("processArtifactGenerateJob", () => {
   });
 });
 
-describe("processArtifactGenerateJob (Pi harness path)", () => {
+describe("processArtifactGenerateJob harness contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.harnessEnabledFor.mockReturnValue(true);
     mocks.updateSet.mockReturnValue({ where: vi.fn().mockResolvedValue([]) });
     mocks.insertValues.mockResolvedValue([]);
     mocks.putObject.mockResolvedValue(undefined);

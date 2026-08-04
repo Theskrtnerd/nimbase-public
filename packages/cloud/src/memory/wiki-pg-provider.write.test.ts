@@ -16,9 +16,7 @@ import { WikiPgProvider } from "./wiki-pg-provider";
 
 const mocks = vi.hoisted(() => ({
   forScopes: vi.fn(),
-  runGardener: vi.fn(),
   runGardenerHarness: vi.fn(),
-  resolveModels: vi.fn(),
   write: vi.fn(),
   selectNode: vi.fn(),
   selectVersion: vi.fn(),
@@ -61,7 +59,7 @@ vi.mock("@acme/db/node-metadata", () => ({
   loadNodeTags: mocks.loadNodeTags,
 }));
 vi.mock("../s3", () => ({ getObjectText: mocks.getObjectText }));
-// The harness twin is stubbed; harnessEnabledFor stays real (env-driven).
+// The harness gardener is the only reconcile runner.
 vi.mock("../harness", async (importOriginal) => {
   const actual = await importOriginal<typeof HarnessModule>();
   return {
@@ -69,16 +67,13 @@ vi.mock("../harness", async (importOriginal) => {
     runGardenerHarness: mocks.runGardenerHarness,
   };
 });
-// reconcile resolves its own model through the central AI layer.
-vi.mock("../ai", () => ({ resolveModels: mocks.resolveModels }));
-// Keep the pure helpers (normalizeTitle, the codec) real; only the FS + gardener
-// are stubbed.
+// Keep the pure helpers (normalizeTitle, the codec) real; only the FS is
+// stubbed.
 vi.mock("./wiki", async (importOriginal) => {
   const actual = await importOriginal<typeof Wiki>();
   return {
     ...actual,
     GardenerFs: { forScopes: mocks.forScopes },
-    runGardener: mocks.runGardener,
   };
 });
 
@@ -115,9 +110,6 @@ beforeEach(() => {
   mocks.getObjectText.mockResolvedValue("stored body");
   mocks.loadNodeSources.mockResolvedValue([]);
   mocks.loadNodeTags.mockResolvedValue([]);
-  mocks.resolveModels.mockResolvedValue({
-    chat: { id: "test-model-id", model: "test-model" },
-  });
 });
 
 describe("WikiPgProvider.upsert", () => {
@@ -215,8 +207,8 @@ describe("WikiPgProvider.reconcile", () => {
     fence: { prefix: "sales", exclude: [] },
   };
 
-  it("runs the gardener with the candidate + fence + resolved model, types the outcome", async () => {
-    mocks.runGardener.mockResolvedValue({
+  it("runs the harness gardener with the candidate and fence, then types the outcome", async () => {
+    mocks.runGardenerHarness.mockResolvedValue({
       report: "merged the launch date",
       usage: { inputTokens: 5, outputTokens: 2 },
       ops: [{ op: "update", kind: "note", path: "sales/q3.md", nodeId: "n1" }],
@@ -228,9 +220,7 @@ describe("WikiPgProvider.reconcile", () => {
       OPTS,
     );
 
-    // The model is resolved by the provider, not passed in.
-    expect(mocks.resolveModels).toHaveBeenCalledWith("ws1");
-    expect(mocks.runGardener).toHaveBeenCalledWith(
+    expect(mocks.runGardenerHarness).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaceId: "ws1",
         sourceId: "src1",
@@ -239,8 +229,6 @@ describe("WikiPgProvider.reconcile", () => {
         sourceTitle: "Launch",
         rawText: "launch moved to Q3",
         fence: OPTS.fence,
-        chatModel: "test-model",
-        chatModelId: "test-model-id",
       }),
     );
     expect(result).toEqual({
@@ -251,48 +239,8 @@ describe("WikiPgProvider.reconcile", () => {
     });
   });
 
-  it("routes through the Pi-harness gardener when the flag lists it", async () => {
-    process.env.NIMBASE_HARNESS_SURFACES = "gardener";
-    try {
-      mocks.runGardenerHarness.mockResolvedValue({
-        report: "harness merged it",
-        usage: { inputTokens: 3, outputTokens: 4 },
-        ops: [
-          { op: "update", kind: "note", path: "sales/q3.md", nodeId: "n1" },
-        ],
-      });
-
-      const result = await new WikiPgProvider().reconcile(
-        makeCtx(),
-        { sourceKind: "web", title: "Launch", content: "launch moved to Q3" },
-        OPTS,
-      );
-
-      expect(mocks.runGardener).not.toHaveBeenCalled();
-      expect(mocks.runGardenerHarness).toHaveBeenCalledWith({
-        workspaceId: "ws1",
-        sourceId: "src1",
-        jobId: "job1",
-        sourceKind: "web",
-        sourceTitle: "Launch",
-        rawText: "launch moved to Q3",
-        fence: OPTS.fence,
-        // no company.md in the mocked wiki → best-effort load yields null
-        companyContext: null,
-      });
-      expect(result).toEqual({
-        action: "merge",
-        nodeId: "n1",
-        report: "harness merged it",
-        usage: { inputTokens: 3, outputTokens: 4 },
-      });
-    } finally {
-      delete process.env.NIMBASE_HARNESS_SURFACES;
-    }
-  });
-
   it("types a merge-then-delete run as supersede", async () => {
-    mocks.runGardener.mockResolvedValue({
+    mocks.runGardenerHarness.mockResolvedValue({
       report: "merged dup into survivor",
       usage: { inputTokens: 1, outputTokens: 1 },
       ops: [

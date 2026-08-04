@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as AcmeCloud from "@acme/cloud";
 import type { ExtractJobData as ExtractJob } from "@acme/cloud";
-import type * as Gardener from "@acme/cloud/memory/wiki";
+import type * as HarnessModule from "@acme/cloud/harness";
 
 // End-to-end capture pipeline test: calls the REAL ingestSource /
 // presignBinarySource / finalizeBinarySource / processExtractJob /
@@ -66,7 +66,7 @@ const mocks = vi.hoisted(() => {
     parseBytes: vi.fn(),
     isParseableMime: vi.fn(() => false),
     parseConfigured: vi.fn(() => false),
-    runGardener: vi.fn(),
+    runGardenerHarness: vi.fn(),
   };
 });
 
@@ -207,9 +207,9 @@ vi.mock("@acme/api/entitlements", () => ({
 vi.mock("@clerk/nextjs/server", () => ({
   clerkClient: () => Promise.resolve({ users: { getUser: mocks.getUser } }),
 }));
-vi.mock("@acme/cloud/memory/wiki", async (importOriginal) => {
-  const actual = await importOriginal<typeof Gardener>();
-  return { ...actual, runGardener: mocks.runGardener };
+vi.mock("@acme/cloud/harness", async (importOriginal) => {
+  const actual = await importOriginal<typeof HarnessModule>();
+  return { ...actual, runGardenerHarness: mocks.runGardenerHarness };
 });
 // Bypass QStash entirely: a "dispatch" just runs the real job processor
 // inline, the same way dev does when QSTASH_TOKEN is unset.
@@ -255,7 +255,7 @@ beforeEach(() => {
     modelId: "google/gemini-2.5-flash",
     usage: { inputTokens: 500, outputTokens: 50 },
   });
-  mocks.runGardener.mockResolvedValue({
+  mocks.runGardenerHarness.mockResolvedValue({
     report: "merged into projects/nimbase",
     usage: { inputTokens: 100, outputTokens: 10 },
     ops: [],
@@ -289,7 +289,7 @@ describe("capture flow: web text capture", () => {
     expect(rawMd).toContain("# Hello\n\nWorld");
 
     // Compile reads exactly what ingest wrote as raw.md.
-    expect(mocks.runGardener).toHaveBeenCalledWith(
+    expect(mocks.runGardenerHarness).toHaveBeenCalledWith(
       expect.objectContaining({ rawText: rawMd, sourceKind: "web" }),
     );
 
@@ -334,7 +334,7 @@ describe("capture flow: screenshot binary capture", () => {
     expect(mocks.extractBinaryText).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "screenshot", mimeType: "image/png" }),
     );
-    expect(mocks.runGardener).toHaveBeenCalledWith(
+    expect(mocks.runGardenerHarness).toHaveBeenCalledWith(
       expect.objectContaining({ rawText: rawMd, sourceKind: "screenshot" }),
     );
 
@@ -422,8 +422,8 @@ describe("capture flow: zip archive import", () => {
     }
 
     // Each child compiled from its own decoded bytes; the container did not.
-    expect(mocks.runGardener).toHaveBeenCalledTimes(2);
-    const compiled = mocks.runGardener.mock.calls
+    expect(mocks.runGardenerHarness).toHaveBeenCalledTimes(2);
+    const compiled = mocks.runGardenerHarness.mock.calls
       .map((call) => String((call[0] as { rawText: string }).rawText))
       .join("\n");
     expect(compiled).toContain("How we work.");
@@ -460,7 +460,7 @@ describe("capture flow: zip archive import", () => {
 
     // Still 3 rows: the retry saw status !== "extracting" and returned.
     expect(mocks.tables.get(mocks.SourceTable)).toHaveLength(3);
-    expect(mocks.runGardener).toHaveBeenCalledTimes(2);
+    expect(mocks.runGardenerHarness).toHaveBeenCalledTimes(2);
   });
 });
 

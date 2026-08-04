@@ -1,7 +1,5 @@
-// The Pi-harness AI runtime: wiki-as-filesystem sandbox, agent definitions
-// (@acme/agents), and per-surface rollout flags.
-export { harnessEnabledFor } from "./flags";
-export type { HarnessSurface } from "./flags";
+// The Pi-harness AI runtime: wiki-as-filesystem sandbox and agent definitions
+// from @acme/agents.
 export { WikiFileSystem, deriveSummary } from "./wiki-file-system";
 export { buildHarnessMounts } from "./run";
 export type {

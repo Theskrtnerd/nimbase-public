@@ -98,8 +98,7 @@ export interface HarnessRunResult {
 
 // One harness turn: build the Pi agent from the eve.dev-style definition,
 // point its sandbox at the provided filesystem, run a single prompt, tear the
-// session down. Session state is not reused — every job is a fresh session,
-// mirroring how the legacy generateText loops were single-shot.
+// session down. Session state is not reused — every job is a fresh session.
 export async function runHarnessAgent(
   args: HarnessRunArgs,
 ): Promise<HarnessRunResult> {

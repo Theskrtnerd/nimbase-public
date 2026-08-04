@@ -21,16 +21,15 @@ import type {
   ReconcileResult,
 } from "./provider";
 import type { GardenerOp } from "./wiki";
-import { resolveModels } from "../ai";
 import { COMPANY_MD_PATH } from "../biographer";
 import { scanReadableGraphInputs, scopeWhere } from "../graph-scan";
-import { harnessEnabledFor, runGardenerHarness } from "../harness";
+import { runGardenerHarness } from "../harness";
 import { buildKnowledgeGraph } from "../knowledge-graph";
 import * as s3 from "../s3";
 import { searchWorkspace } from "../search";
 import { parseOkf, serializeOkf } from "./okf/codec";
 import { assertOpToolset, CapabilityNotSupportedError } from "./provider";
-import { GardenerFs, normalizeTitle, runGardener, WikiReadFs } from "./wiki";
+import { GardenerFs, normalizeTitle, WikiReadFs } from "./wiki";
 
 // Re-exported so the shared scope-filter helper stays reachable from the
 // provider's public surface (and its unit tests) even though it now lives in
@@ -383,23 +382,7 @@ export class WikiPgProvider implements MemoryProvider {
       companyContext,
     };
 
-    // Flagged runner: the Pi-harness gardener (wiki mounted as the sandbox
-    // filesystem) vs the legacy generateText loop. Same GardenerResult
-    // contract either way, so the reconcile derivation below is shared.
-    if (harnessEnabledFor("gardener")) {
-      const { report, usage, ops } = await runGardenerHarness(gardenerArgs);
-      return { ...deriveReconcileAction(ops), report, usage };
-    }
-
-    // The provider owns model selection (per-workspace AI config → global →
-    // defaults); callers never pass a model string.
-    const { chat } = await resolveModels(ctx.workspaceId);
-
-    const { report, usage, ops } = await runGardener({
-      ...gardenerArgs,
-      chatModel: chat.model,
-      chatModelId: chat.id,
-    });
+    const { report, usage, ops } = await runGardenerHarness(gardenerArgs);
 
     return { ...deriveReconcileAction(ops), report, usage };
   }

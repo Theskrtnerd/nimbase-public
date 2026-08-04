@@ -59,8 +59,8 @@ export function kbSearchTool(opts: {
   };
 }
 
-// The gardener's metadata/domain tools, mirroring the legacy loop's custom
-// toolset minus generic file ops (harness built-ins own those).
+// The gardener's metadata/domain tools. Generic file operations are absent
+// because the harness built-ins own them through the sandbox filesystem.
 export function gardenerDomainTools(fs: GardenerFs): ToolSet {
   return {
     list_tags: tool({

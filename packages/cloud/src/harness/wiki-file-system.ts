@@ -20,7 +20,7 @@ import { VfsError } from "../memory/wiki/vfs";
 //
 // Write summaries: the harness's generic file tools carry no summary argument,
 // so writes derive one from the body (frontmatter title / first line). The
-// wrapped GardenerFs keeps recording ops exactly as in the legacy loop.
+// wrapped GardenerFs keeps recording the operations used to classify the run.
 
 // Structural equivalents of just-bash fs types it doesn't export from its
 // package root; `implements IFileSystem` still checks them structurally.
