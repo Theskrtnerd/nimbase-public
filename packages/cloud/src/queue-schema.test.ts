@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  agentTurnJobSchema,
   artifactGenerateJobSchema,
   brainInitJobSchema,
   compileJobSchema,
   crawlJobSchema,
-  docSiteBuildJobSchema,
   extractJobSchema,
 } from "./queue";
 
@@ -46,15 +44,6 @@ describe("job payload schemas round-trip every field", () => {
     };
     expect(crawlJobSchema.parse(crawl)).toEqual(crawl);
 
-    const turn = {
-      jobId: "j1",
-      connectionId: "c1",
-      threadId: "slack:C123:1699.99",
-      userText: "hi",
-      externalUserId: "U1",
-    };
-    expect(agentTurnJobSchema.parse(turn)).toEqual(turn);
-
     const brain = {
       jobId: "j1",
       workspaceId: "w1",
@@ -63,28 +52,5 @@ describe("job payload schemas round-trip every field", () => {
       identitySources: { title: "manual", description: "website" },
     };
     expect(brainInitJobSchema.parse(brain)).toEqual(brain);
-
-    const docSite = {
-      jobId: "j1",
-      buildId: "b1",
-      docSiteId: "d1",
-      workspaceId: "w1",
-    };
-    expect(docSiteBuildJobSchema.parse(docSite)).toEqual(docSite);
-  });
-
-  it("carries no fence on a docs-site build job", () => {
-    // The fence is derived from the site's optional folder anchor at job time,
-    // never sent. A caller able to enqueue cannot choose the published scope.
-    const parsed: Record<string, unknown> = docSiteBuildJobSchema.parse({
-      jobId: "j1",
-      buildId: "b1",
-      docSiteId: "d1",
-      workspaceId: "w1",
-      readScopes: null,
-      folderId: "folder-1",
-    });
-    expect(parsed.readScopes).toBeUndefined();
-    expect(parsed.folderId).toBeUndefined();
   });
 });

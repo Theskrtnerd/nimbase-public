@@ -26,9 +26,8 @@ export default async function WorkspacePage({
   }
 
   // The URL segment carries the slug, but keep accepting a raw workspace UUID
-  // so legacy bookmarks and server-side redirects that still emit an id (Stripe
-  // billing return, OAuth callbacks) resolve — we canonicalize them to the slug
-  // URL below.
+  // so legacy bookmarks and server-side redirects that still emit an id resolve
+  // — we canonicalize them to the slug URL below.
   const asUuid = z.uuid().safeParse(workspaceSlug);
 
   // Access is membership, not ownership: any WorkspaceMember (owner/admin/member)
@@ -62,7 +61,7 @@ export default async function WorkspacePage({
   }
 
   // Canonicalize an id (or any non-slug spelling) to the stable slug URL,
-  // preserving query params so banners like ?billing=<state> survive.
+  // preserving query params used by integration callbacks.
   if (workspace.slug !== workspaceSlug) {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {

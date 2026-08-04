@@ -14,8 +14,7 @@ import type { PathScope } from "@acme/db";
 import type { GroupMcpTool, SourceConnectionProvider } from "@acme/db/schema";
 
 import type { WorkspaceBrainInit } from "./lib/workspace-control";
-import { requireAccess, resolveGodModeAccess } from "./lib/access";
-import { assertGod } from "./lib/operator";
+import { requireAccess } from "./lib/access";
 
 export interface ApiSession {
   user: {
@@ -92,17 +91,6 @@ export interface GroupMcpAIPort {
 // queue-agnostic — same injected-port pattern as CompilePort/CrawlPort.
 export type BrainInitPort = WorkspaceBrainInit;
 
-// Enqueues a documentation-site build. Implemented in the app (QStash in prod,
-// inline in dev) so this package stays queue-agnostic — same injected-port
-// pattern as CompilePort/CrawlPort.
-export interface DocSitePort {
-  enqueue: (args: {
-    buildId: string;
-    docSiteId: string;
-    workspaceId: string;
-  }) => Promise<void>;
-}
-
 /**
  * 1. CONTEXT
  *
@@ -123,11 +111,6 @@ export const createTRPCContext = (opts: {
   tokens?: TokenPort;
   groupMcpAI?: GroupMcpAIPort;
   brainInit?: BrainInitPort;
-  docSites?: DocSitePort;
-  // Lazily resolves the caller's email for the god-mode allowlist. Only invoked
-  // on operator paths, so hot requests never pay for the Clerk lookup it may do.
-  // Defaults to whatever email the session already carries (null for most).
-  resolveEmail?: () => Promise<string | null>;
   // Lazily resolves the signed-in user's display profile. Member names are
   // stored as snapshots, but older member rows may predate those columns.
   resolveUserProfile?: () => Promise<UserProfile | null>;
@@ -139,10 +122,6 @@ export const createTRPCContext = (opts: {
     tokens: opts.tokens ?? null,
     groupMcpAI: opts.groupMcpAI ?? null,
     brainInit: opts.brainInit ?? null,
-    docSites: opts.docSites ?? null,
-    resolveEmail:
-      opts.resolveEmail ??
-      (() => Promise.resolve(opts.session?.user.email ?? null)),
     resolveUserProfile:
       opts.resolveUserProfile ?? (() => Promise.resolve(null)),
   };
@@ -252,26 +231,3 @@ export const workspaceProcedure = protectedProcedure
     const access = await requireAccess(ctx.session.user.id, input.workspaceId);
     return next({ ctx: { access } });
   });
-
-/**
- * Operator (god-mode) procedure — read-only support access
- *
- * Requires `workspaceId` in the input and that the caller is a platform god
- * (`GODS` email allowlist). Attaches a full-admin `ctx.access`
- * tagged `viaGodMode: true` WITHOUT any WorkspaceMember row, so support staff
- * can inspect any workspace without being invited. Distinct from
- * `workspaceProcedure` on purpose: this bypass must never back a mutation, so
- * only read queries build on it.
- */
-const operatorProcedureBuilder = protectedProcedure
-  .input(z.object({ workspaceId: z.string().uuid() }))
-  .use(async ({ ctx, input, next }) => {
-    assertGod(await ctx.resolveEmail());
-    const access = resolveGodModeAccess(ctx.session.user.id, input.workspaceId);
-    return next({ ctx: { access } });
-  });
-
-// Exposes only `.query` (no `.mutation`) so the read-only guarantee above is
-// structural, not just a comment a future endpoint could ignore.
-export const operatorProcedure: Pick<typeof operatorProcedureBuilder, "query"> =
-  operatorProcedureBuilder;

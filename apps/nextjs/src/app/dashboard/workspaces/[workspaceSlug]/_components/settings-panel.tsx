@@ -13,13 +13,10 @@ import { toast } from "@acme/ui/toast";
 import type { SettingsSection, SettingsSectionId } from "./settings-sections";
 import { formatDate } from "~/lib/format-date";
 import { useTRPC } from "~/trpc/react";
-import { AiModelsSettings } from "./ai-models-settings";
 import { AppearanceSettings } from "./appearance-settings";
-import { BillingSettings } from "./billing-settings";
 import { IntegrationsSettings } from "./integrations-settings";
 import { McpSettings } from "./mcp-settings";
 import { MembersSettings } from "./members-settings";
-import { PlanOverrideSettings } from "./plan-override-settings";
 import { WorkspaceAiSettings } from "./workspace-ai-settings";
 
 interface Workspace {
@@ -50,13 +47,6 @@ export function SettingsPanel({
       </>
     ),
     ai: <WorkspaceAiSettings workspaceId={workspace.id} />,
-    billing: <BillingSettings workspaceId={workspace.id} />,
-    god: (
-      <>
-        <AiModelsSettings />
-        <PlanOverrideSettings workspaceId={workspace.id} />
-      </>
-    ),
   };
 
   const Icon = section.icon;

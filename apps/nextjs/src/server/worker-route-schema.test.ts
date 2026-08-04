@@ -16,8 +16,6 @@ const WORKER_ROUTES = [
   ["crawl/route.ts", "crawlJobSchema"],
   ["artifacts/generate/route.ts", "artifactGenerateJobSchema"],
   ["brain/init/route.ts", "brainInitJobSchema"],
-  ["agents/turn/route.ts", "agentTurnJobSchema"],
-  ["docsites/generate/route.ts", "docSiteBuildJobSchema"],
 ] as const;
 
 const API_DIR = join(import.meta.dirname, "../app/api");

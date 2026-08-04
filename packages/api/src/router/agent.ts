@@ -179,7 +179,7 @@ export const agentRouter = {
   // Editable: persona, name, enabled, artifact authoring. The anchor is fixed at
   // creation (changing it would mean migrating the default grant — out of scope
   // for v1). Artifact fields ride the same manager-on-anchor gate as deployment:
-  // whoever can put this agent in a Slack workspace decides what it may publish.
+  // whoever exposes this agent through an interface decides what it may publish.
   update: protectedProcedure
     .input(
       z.object({

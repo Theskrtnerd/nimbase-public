@@ -14,7 +14,6 @@ export const env = createEnv({
    * This way you can ensure the app isn't built with invalid env vars.
    */
   server: {
-    NIMBASE_EDITION: z.enum(["cloud", "community"]).default("cloud"),
     CLERK_SECRET_KEY: z.string().min(1),
     POSTGRES_URL: z.url(),
     DESKTOP_AUTH_SECRET: z.string().min(32),
@@ -24,33 +23,12 @@ export const env = createEnv({
     // png/pdf chat attachments degrade to posting the share link.
     ARTIFACT_RENDERER_URL: z.url().optional(),
     ARTIFACT_RENDERER_TOKEN: z.string().min(16).optional(),
-    // Stripe billing (server only; hosted Checkout + Customer Portal + webhooks).
-    STRIPE_SECRET_KEY: z.string().min(1).optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
-    STRIPE_PRICE_PRO: z.string().min(1).optional(),
-    STRIPE_PORTAL_RETURN_URL: z.url().optional(),
     // Optional API key for a self-hosted OpenAI-compatible AI endpoint (used
     // only when the global ai_config providerKind is "openai-compatible").
     NIMBASE_AI_API_KEY: z.string().min(1).optional(),
-    // Comma-separated email addresses granted platform god-mode (edit the
-    // global ai_config, plan overrides, support console, crawl scheduling).
-    GODS: z.string().optional(),
-    // Docs-site build runner. Unset → publishing is unavailable and says so;
-    // the rest of the docs-site surface (create/list/remove) still works.
-    // Host published docs sites are served at. Defaults to docs.<appHost>.
-    NIMBASE_DOCS_HOST: z.string().min(1).optional(),
-    DOCS_BUILDER_REPO: z.string().min(1).optional(),
-    DOCS_BUILDER_TOKEN: z.string().min(1).optional(),
-    // HMAC secret the runner signs its completion callback with.
-    DOCS_BUILDER_CALLBACK_SECRET: z.string().min(16).optional(),
     QSTASH_TOKEN: z.string().min(1).optional(),
     QSTASH_CURRENT_SIGNING_KEY: z.string().min(1).optional(),
     QSTASH_NEXT_SIGNING_KEY: z.string().min(1).optional(),
-    // Distributed Nimbase Slack app credentials (agent deployment). Optional so
-    // the app boots without Slack configured.
-    SLACK_CLIENT_ID: z.string().min(1).optional(),
-    SLACK_CLIENT_SECRET: z.string().min(1).optional(),
-    SLACK_SIGNING_SECRET: z.string().min(1).optional(),
     // AES-256-GCM key sealing agent + source-connection secrets (bot/OAuth
     // tokens).
     AGENT_CONNECTION_SECRET: z.string().min(16).optional(),

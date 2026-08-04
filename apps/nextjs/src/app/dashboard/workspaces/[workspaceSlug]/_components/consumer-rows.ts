@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { BookOpenIcon, BotIcon, KeyIcon, ServerIcon } from "lucide-react";
+import { BotIcon, KeyIcon, ServerIcon } from "lucide-react";
 
 import type { RouterOutputs } from "@acme/api";
 
@@ -7,14 +7,14 @@ import type { StatusTone } from "./table-primitives";
 
 /**
  * A *consumer* is anything non-human that has been deployed against company
- * memory: an agent, a group MCP endpoint, a docs site, or an API token. Agent
+ * memory: an agent, a group MCP endpoint, or an API token. Agent
  * interfaces such as Slack and Widget render as deployments on the Agent row.
  * This module owns the union and its projection into a common row shape.
  *
  * Human principals (members, groups) are deliberately NOT consumers — they live
  * in the Permissions tab, on the folder they were granted.
  */
-export type ConsumerKind = "agent" | "mcp" | "token" | "docsite";
+export type ConsumerKind = "agent" | "mcp" | "token";
 
 export type { StatusTone } from "./table-primitives";
 
@@ -85,14 +85,12 @@ export const KIND_LABEL: Record<ConsumerKind, string> = {
   agent: "Agent",
   mcp: "Group MCP",
   token: "API token",
-  docsite: "Docs site",
 };
 
 export const KIND_ICON: Record<ConsumerKind, LucideIcon> = {
   agent: BotIcon,
   mcp: ServerIcon,
   token: KeyIcon,
-  docsite: BookOpenIcon,
 };
 
 /** Folder paths render as `/eng/docs`; the root renders as a word, not `/`. */
@@ -115,7 +113,6 @@ function relative(date: Date | null): string {
 
 type AgentRow = RouterOutputs["agent"]["list"][number];
 type McpRow = RouterOutputs["groupMcp"]["list"][number];
-type DocSiteListRow = RouterOutputs["docSite"]["list"][number];
 
 export function agentToRow(a: AgentRow): ConsumerRow {
   return {
@@ -157,44 +154,6 @@ export function mcpToRow(m: McpRow): ConsumerRow {
     activityAt: null,
     activityLabel: `${m.tools.length} tool${m.tools.length === 1 ? "" : "s"}`,
     deployments: [],
-  };
-}
-
-export function docSiteToRow(d: DocSiteListRow): ConsumerRow {
-  // A docs site is a consumer in the literal sense: it reads a memory slice and
-  // republishes it, and its /llms.txt makes the result agent-readable too.
-  // Mapped into the existing three-tone vocabulary rather than extending it —
-  // StatusTone is shared with the monochrome badges (DESIGN.md §6/§7), so a new
-  // tone would ripple through every table.
-  const label: Record<
-    string,
-    { text: string; tone: ConsumerRow["statusTone"] }
-  > = {
-    live: { text: "Live", tone: "active" },
-    building: { text: "Building", tone: "idle" },
-    failed: { text: "Failed", tone: "warn" },
-    draft: { text: "Not published", tone: "idle" },
-  };
-  const status = label[d.status] ?? { text: d.status, tone: "idle" as const };
-
-  return {
-    id: d.slug,
-    kind: "docsite",
-    name: d.name,
-    subtitle: d.folderPath.length > 0 ? d.folderPath : "Whole KB",
-    scope: d.folderPath,
-    // Read-only by construction: a published site never writes back to memory.
-    tools: ["view"],
-    statusLabel: status.text,
-    statusTone: status.tone,
-    activityAt: d.lastBuiltAt,
-    activityLabel: d.lastBuiltAt ? relative(d.lastBuiltAt) : "Never published",
-    deployments: [
-      {
-        label: d.visibility === "public" ? "Public" : "Workspace readers",
-        tone: "ok" as const,
-      },
-    ],
   };
 }
 

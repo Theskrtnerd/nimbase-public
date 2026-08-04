@@ -429,7 +429,6 @@ function AgentTestChat({
 function AgentConnections({ agentId }: { agentId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
   const connections = useQuery(
     trpc.agent.connections.queryOptions({ agentId }),
   );
@@ -444,22 +443,7 @@ function AgentConnections({ agentId }: { agentId: string }) {
 
   return (
     <section className="bg-card border-border flex flex-col gap-3 rounded-xl border p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-foreground text-[14px] font-semibold">
-          Deployments
-        </h2>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => {
-              posthog.capture("agent_deployed", { platform: "slack" });
-              window.location.href = `/api/agents/slack/install?agentId=${agentId}`;
-            }}
-          >
-            Deploy to Slack
-          </Button>
-        </div>
-      </div>
+      <h2 className="text-foreground text-[14px] font-semibold">Deployments</h2>
       {connections.data && connections.data.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {connections.data.map((c) => (

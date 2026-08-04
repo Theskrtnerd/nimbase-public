@@ -7,7 +7,6 @@ import { getAuthSession, getSession } from "~/auth/server";
 import { clerkInvitePort } from "~/server/auth/accept-invites";
 import { brainInitPort } from "~/server/brain/port";
 import { crawlPort } from "~/server/crawl/port";
-import { docSiteBuildPort } from "~/server/docsite/dispatch";
 import { groupMcpAIPort } from "~/server/group-mcp/ai-port";
 import { tokensPort } from "~/server/group-mcp/token-port";
 
@@ -43,10 +42,6 @@ const handler = async (req: NextRequest) => {
         tokens: tokensPort,
         groupMcpAI: groupMcpAIPort,
         brainInit: brainInitPort,
-        docSites: docSiteBuildPort,
-        // Lazy: only god-gated procedures call this, and getSession is
-        // request-cached, so ordinary requests never trigger the Clerk lookup.
-        resolveEmail: async () => (await getSession())?.user.email ?? null,
         resolveUserProfile: async () => {
           const user = (await getSession())?.user;
           return user ? { name: user.name, email: user.email } : null;

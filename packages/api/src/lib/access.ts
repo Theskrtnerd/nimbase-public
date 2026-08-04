@@ -24,11 +24,6 @@ export interface AccessContext {
   userProfileId: string | null;
   role: WorkspaceRole;
   isAdmin: boolean; // owner or admin — full bypass, restricted included
-  // True when this context was granted to a platform operator with no
-  // WorkspaceMember row (god mode). Read-only support visibility — call sites,
-  // UI, and audit logging use it to distinguish operator access from real
-  // membership. Never set for a genuine member.
-  viaGodMode: boolean;
   grants: ResolvedGrant[];
   restricted: string[];
   canRead(path: string): boolean;
@@ -45,7 +40,6 @@ export function buildAccessContext(args: {
   role: WorkspaceRole;
   grants: ResolvedGrant[];
   restricted: string[];
-  viaGodMode?: boolean;
 }): AccessContext {
   const isAdmin = args.role === "owner" || args.role === "admin";
   const has = (min: GrantRole, path: string) =>
@@ -56,7 +50,6 @@ export function buildAccessContext(args: {
     userProfileId: args.userProfileId ?? null,
     role: args.role,
     isAdmin,
-    viaGodMode: args.viaGodMode ?? false,
     grants: args.grants,
     restricted: args.restricted,
     canRead: (path) => has("viewer", path),
@@ -120,26 +113,6 @@ export function anchoredContext(args: {
     role: "member",
     grants: [{ prefix: args.folderPath, role: args.role }],
     restricted: args.restricted,
-  });
-}
-
-// God-mode access for a platform operator: full-admin visibility on any
-// workspace without a WorkspaceMember row. Tagged viaGodMode so read surfaces
-// and audit logging can tell it apart from real membership. Deliberately NOT
-// wired into resolveAccess/workspaceProcedure — that path also backs mutations,
-// and god mode is read-only (operators reach it only through the dedicated
-// operatorProcedure). Caller is responsible for the isGod gate.
-export function resolveGodModeAccess(
-  userId: string,
-  workspaceId: string,
-): AccessContext {
-  return buildAccessContext({
-    workspaceId,
-    userId,
-    role: "admin",
-    grants: [],
-    restricted: [],
-    viaGodMode: true,
   });
 }
 

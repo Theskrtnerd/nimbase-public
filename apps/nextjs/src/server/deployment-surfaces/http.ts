@@ -12,9 +12,6 @@ import {
   authorizeWorkspaceRequest,
   authzErrorResponse,
 } from "~/server/auth/authorize-workspace";
-// Relative, not `~/lib/...`: vitest has no `~` alias, and this module is
-// imported transitively by a test — an aliased import here fails to resolve.
-import { docSiteUrl } from "../../lib/doc-site-url";
 
 export type AuthorizedAdmin = AuthorizedWorkspace & { userId: string };
 
@@ -66,49 +63,6 @@ export async function mcpDeploymentResponse(
     authMethods: ["oauth"] as const,
     url: groupMcpUrl(request, orgSlug, deployment.slug),
   };
-}
-
-export function docSiteDeploymentResponse(
-  request: Request,
-  deployment: {
-    slug: string;
-    name: string;
-    folderPath: string;
-    visibility: "private" | "public";
-    status: "draft" | "building" | "live" | "failed";
-    templateVersion: string;
-    lastBuiltAt: Date | null;
-    error: string | null;
-  },
-  workspaceSlug: string,
-) {
-  const { lastBuiltAt, ...rest } = deployment;
-  return {
-    ...rest,
-    url: docSiteUrlFrom(request, workspaceSlug, deployment.slug),
-    lastBuiltAt: lastBuiltAt?.toISOString() ?? null,
-  };
-}
-
-// Thin request adapter over the canonical docSiteUrl: it only decides which
-// host the caller should be told about. Dev has no docs host, so the URL points
-// at the route directly — otherwise a local `deploy docs get` prints an address
-// that cannot resolve.
-function docSiteUrlFrom(
-  request: Request,
-  workspaceSlug: string,
-  siteSlug: string,
-): string {
-  const url = new URL(request.url);
-  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
-  return docSiteUrl({
-    workspaceSlug,
-    siteSlug,
-    docsHost: isLocal
-      ? undefined
-      : (env.NIMBASE_DOCS_HOST ?? `docs.${url.hostname.replace(/^app\./, "")}`),
-    devOrigin: url.origin,
-  });
 }
 
 function groupMcpUrl(

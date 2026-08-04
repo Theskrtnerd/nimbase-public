@@ -4,15 +4,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { env } from "~/env";
 
 // Inverse model: only routes matched here require a Clerk session. Everything
-// else (all API routes — including unauthenticated callbacks like the Stripe
-// webhook `/api/stripe/webhook` and QStash jobs — plus public pages) stays
-// public and self-authorizes in its handler. Do NOT add `/api/stripe/webhook`
-// or other webhook/callback paths here; Stripe verifies its own signature.
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/desktop(.*)",
-  "/admin(.*)",
-]);
+// else (including signed QStash jobs and public pages) stays public and
+// self-authorizes in its handler.
+const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/desktop(.*)"]);
 
 // Map mcp.<appHost>/<org>/<group>/mcp → /api/group-mcp/<org>/<group>. Returns
 // null when the host isn't the dedicated MCP subdomain or the path isn't a group

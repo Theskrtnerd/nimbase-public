@@ -11,6 +11,12 @@ for companies. Organized around the three stages of the memory lifecycle:
 
 `auth`, `workspace`, and `doctor` sit alongside them as plumbing.
 
+The Apache-licensed CLI is a shared client for Community Edition and Nimbase
+Cloud. A Community server supports the memory, sync, widget, artifact, share,
+and MCP commands. `workspace plan`, `deploy docs`, and the first-party Slack
+interface target optional Nimbase Cloud server adapters and are not installed
+by the Community runtime.
+
 ## Install
 
 ```sh
@@ -49,7 +55,7 @@ nimbase workspace create \
 nimbase workspace list             # the default is marked with *
 nimbase workspace use acme         # select by short workspace slug
 nimbase workspace status           # plan, memory, capture, and sync health
-nimbase workspace plan pro         # owner: Stripe Checkout; staff: direct override
+nimbase workspace plan pro         # Nimbase Cloud
 nimbase workspace model            # effective agent model + available choices
 nimbase workspace model google/gemini-2.5-flash
 nimbase workspace model --inherit  # return to the global default
@@ -105,7 +111,7 @@ configure its interface, tools, publication, or sharing behavior. Every create
 command accepts `--slug`; otherwise Nimbase derives a stable slug from the prompt.
 
 ```sh
-# An agent deployed to Slack
+# Nimbase Cloud's first-party Slack interface
 nimbase deploy agent create "Support Assistant" --interface slack
 
 # The same agent model, delivered as an embeddable website interface
@@ -122,7 +128,7 @@ nimbase deploy mcp list
 nimbase deploy mcp get customer-support
 nimbase deploy mcp remove customer-support
 
-# A documentation site written from memory
+# Nimbase Cloud's managed documentation publisher
 nimbase deploy docs create "Acme Docs" --public
 nimbase deploy docs create "Engineering Docs" --folder engineering
 nimbase deploy docs publish acme-docs --wait

@@ -54,14 +54,6 @@ export const s3KeyFor = {
     `workspaces/${workspaceId}/artifactes/${id}.html`,
   artifactSource: (workspaceId: string, id: string) =>
     `workspaces/${workspaceId}/artifactes/${id}.tsx`,
-  // Projected Nimbus content handed to the build runner, one JSON bundle.
-  docSiteInput: (workspaceId: string, buildId: string) =>
-    `workspaces/${workspaceId}/docsites/builds/${buildId}/input.json`,
-  // Built static output. Keyed by BUILD, not by site: a build lands in a fresh
-  // prefix and DocSite.liveBuildId flips only once it succeeds, so a failed
-  // rebuild can never half-overwrite a site that is already serving.
-  docSiteAsset: (workspaceId: string, buildId: string, path: string) =>
-    `workspaces/${workspaceId}/docsites/builds/${buildId}/dist/${path}`,
 };
 
 export async function putObject(

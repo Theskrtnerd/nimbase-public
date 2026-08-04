@@ -309,7 +309,7 @@ export function ConsumersTable({
               >
                 {globalFilter.trim()
                   ? "Nothing matches that search."
-                  : "Nothing deployed yet. Use New to connect an agent, MCP endpoint, docs site, or token to this workspace's memory."}
+                  : "Nothing deployed yet. Use New to connect an agent, MCP endpoint, or token to this workspace's memory."}
               </TableCell>
             </TableRow>
           ) : (

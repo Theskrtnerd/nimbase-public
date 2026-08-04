@@ -27,7 +27,6 @@ import { useTRPC } from "~/trpc/react";
 import { AgentDetail, CreateAgentForm } from "./agents-view";
 import {
   agentToRow,
-  docSiteToRow,
   KIND_ICON,
   KIND_LABEL,
   mcpToRow,
@@ -35,10 +34,9 @@ import {
 } from "./consumer-rows";
 import { CreateTokenForm, TokenDetail } from "./consumer-token-forms";
 import { ConsumersTable } from "./consumers-table";
-import { DocSiteCard, DocSiteForm } from "./doc-site-panel";
 import { CreateGroupMcpPanel, GroupMcpRowCard } from "./group-mcp-settings";
 
-const KIND_ORDER: ConsumerKind[] = ["agent", "mcp", "docsite", "token"];
+const KIND_ORDER: ConsumerKind[] = ["agent", "mcp", "token"];
 
 /** Which row is open in the detail sheet — kind plus the row's id. */
 interface Selection {
@@ -50,7 +48,7 @@ interface Selection {
  * Consumers (DESIGN.md §8.6) — the single governance view for everything that
  * consumes company memory. The "Consumers" tab is one table of all four
  * deployed non-human principals (agents and their interfaces, group MCP
- * endpoints, docs sites, API tokens); the "Permissions" tab is the folder-level
+ * endpoints, and API tokens); the "Permissions" tab is the folder-level
  * grant map that decides what any of them can actually read.
  *
  * This replaced the separate Access and Agents views: the two were describing
@@ -74,16 +72,14 @@ export function ConsumersView({ workspaceId }: { workspaceId: string }) {
   // this table rather than an error state — hence `?? []` on isError below.
   const mcps = useQuery(trpc.groupMcp.list.queryOptions({ workspaceId }));
   const tokens = useQuery(trpc.token.list.queryOptions({ workspaceId }));
-  const docSites = useQuery(trpc.docSite.list.queryOptions({ workspaceId }));
 
   const rows = useMemo<ConsumerRow[]>(
     () => [
       ...(agents.data ?? []).map(agentToRow),
       ...(mcps.data ?? []).map(mcpToRow),
-      ...(docSites.data ?? []).map(docSiteToRow),
       ...(tokens.data ?? []).map(tokenToRow),
     ],
-    [agents.data, mcps.data, docSites.data, tokens.data],
+    [agents.data, mcps.data, tokens.data],
   );
 
   const visibleRows = useMemo(
@@ -99,7 +95,6 @@ export function ConsumersView({ workspaceId }: { workspaceId: string }) {
 
   const deleteAgent = useMutation(trpc.agent.delete.mutationOptions({}));
   const deleteMcp = useMutation(trpc.groupMcp.delete.mutationOptions({}));
-  const deleteDocSite = useMutation(trpc.docSite.delete.mutationOptions({}));
   const revokeToken = useMutation(trpc.token.revoke.mutationOptions({}));
 
   const handleDelete = useCallback(
@@ -122,14 +117,6 @@ export function ConsumersView({ workspaceId }: { workspaceId: string }) {
               trpc.groupMcp.list.queryFilter({ workspaceId }),
             );
             break;
-          case "docsite":
-            // A docs-site row is keyed by slug, not a uuid — the slug is the
-            // stable workspace-scoped identifier the whole surface uses.
-            await deleteDocSite.mutateAsync({ workspaceId, slug: row.id });
-            await queryClient.invalidateQueries(
-              trpc.docSite.list.queryFilter({ workspaceId }),
-            );
-            break;
           case "token":
             await revokeToken.mutateAsync({ workspaceId, id: row.id });
             await queryClient.invalidateQueries(
@@ -143,15 +130,7 @@ export function ConsumersView({ workspaceId }: { workspaceId: string }) {
       }
       setSelected((cur) => (cur?.id === row.id ? null : cur));
     },
-    [
-      deleteAgent,
-      deleteMcp,
-      deleteDocSite,
-      revokeToken,
-      queryClient,
-      trpc,
-      workspaceId,
-    ],
+    [deleteAgent, deleteMcp, revokeToken, queryClient, trpc, workspaceId],
   );
 
   const handleSelect = useCallback((row: ConsumerRow) => {
@@ -286,17 +265,11 @@ const CREATE_COPY: Record<
 > = {
   agent: {
     title: "New agent",
-    description:
-      "Answers from company memory in Slack, Teams, and other chat platforms.",
+    description: "Answers from company memory in the app or a website widget.",
   },
   mcp: {
     title: "New group MCP endpoint",
     description: "A hosted MCP URL for external tools and agents.",
-  },
-  docsite: {
-    title: "New docs site",
-    description:
-      "A documentation site generated from company memory, rebuilt on demand.",
   },
   token: {
     title: "New API token",
@@ -336,9 +309,6 @@ function CreateSheet({
                   workspaceId={workspaceId}
                   orgSlug={orgSlug}
                 />
-              )}
-              {kind === "docsite" && (
-                <DocSiteForm workspaceId={workspaceId} onCreated={onClose} />
               )}
               {kind === "token" && (
                 <CreateTokenForm workspaceId={workspaceId} onDone={onClose} />
@@ -408,10 +378,6 @@ function DetailBody({
     ...trpc.groupMcp.list.queryOptions({ workspaceId }),
     enabled: selection.kind === "mcp",
   });
-  const docSites = useQuery({
-    ...trpc.docSite.list.queryOptions({ workspaceId }),
-    enabled: selection.kind === "docsite",
-  });
 
   switch (selection.kind) {
     case "agent":
@@ -430,17 +396,6 @@ function DetailBody({
           workspaceId={workspaceId}
           orgSlug={orgSlug}
           row={row}
-        />
-      );
-    }
-    case "docsite": {
-      const row = docSites.data?.find((d) => d.slug === selection.id);
-      if (!row) return <DetailFallback loading={docSites.isLoading} />;
-      return (
-        <DocSiteCard
-          workspaceId={workspaceId}
-          workspaceSlug={orgSlug ?? ""}
-          site={row}
         />
       );
     }

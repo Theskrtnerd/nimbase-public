@@ -35,7 +35,9 @@ export function WorkspaceAiSettings({ workspaceId }: { workspaceId: string }) {
   const configQuery = useQuery(
     trpc.workspaceAiConfig.get.queryOptions({ workspaceId }, { retry: false }),
   );
-  const optionsQuery = useQuery(trpc.aiConfig.options.queryOptions());
+  const optionsQuery = useQuery(
+    trpc.workspaceAiConfig.options.queryOptions({ workspaceId }),
+  );
 
   if (configQuery.isError || !configQuery.data || !optionsQuery.data) {
     return null;

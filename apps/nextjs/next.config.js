@@ -15,17 +15,6 @@ const posthogAssetsHost = posthogHost.replace(
   "$1$2-assets.",
 );
 
-// Published docs sites are served under one ordinary subdomain, by path:
-//   docs.nimbase.ai/<workspace-slug>/<site-slug>/...
-//
-// One CNAME, covered by an existing single-label wildcard cert — no nameserver
-// delegation and no per-site domain registration. The cost is that Nimbus is
-// base-unaware (`BASE_URL` appears nowhere in its runtime), so the builder
-// repo's starter carries a small `withBase` patch at the few places nav data
-// enters a page. Verified against a real build; see the runner README.
-const docsHost =
-  process.env.NIMBASE_DOCS_HOST ??
-  `docs.${process.env.NEXT_PUBLIC_APP_HOST ?? "nimbase.ai"}`;
 const sourceUrl =
   process.env.NEXT_PUBLIC_NIMBASE_SOURCE_URL ??
   "https://github.com/Theskrtnerd/nimbase-public";
@@ -72,18 +61,7 @@ const config = {
 
   async rewrites() {
     return {
-      // Published docs sites live on their own host and are served out of S3
-      // by a route handler. This is a `beforeFiles` host rewrite rather than a
-      // middleware rewrite on purpose: the middleware matcher excludes static
-      // asset extensions (.css/.js/.woff2/…), so a middleware-based rewrite
-      // would serve a site's HTML and 404 every asset it references.
-      beforeFiles: [
-        {
-          source: "/:path*",
-          has: [{ type: "host", value: docsHost }],
-          destination: "/api/docs-site/:path*",
-        },
-      ],
+      beforeFiles: [],
       afterFiles: [
         {
           source: "/ingest/static/:path*",

@@ -41,20 +41,19 @@ is already there.
 capture/sync  →  compile  →  centralized KB  →  deploy
 ```
 
-| Stage        | What it means                                                                                                                                                                                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stage        | What it means                                                                                                                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Sync**     | Out-of-process connectors feed memory continuously on a per-connection interval with scope selection and opaque cursors. Community Edition owns the protocol and orchestration; connector authors own provider authentication and APIs. Plus one-off capture from the CLI and MCP `capture` tool. |
-| **Memory**   | The gardener agent compiles captures into structured memory. Bodies are [OKF v0.1](./docs/superpowers/specs/2026-07-18-nimbase-okf-memory-format-design.md) markdown with YAML frontmatter, versioned in S3; Postgres is a derived index. Retrieval is hybrid vector + full-text, fused by RRF. |
-| **Identity** | `UserProfile` resolves an employee across connected systems by stable provider identity first, then exact verified company email. Names are never used as identity evidence.                                                                                                                    |
-| **Deploy**   | Agents, MCP endpoints, and docs sites use the whole KB by default. An optional folder anchor can narrow a deployment without creating another copy of memory. Agents can be reached through Slack or an embeddable widget interface.                                                            |
+| **Memory**   | The gardener agent compiles captures into structured memory. Bodies are [OKF v0.1](./docs/superpowers/specs/2026-07-18-nimbase-okf-memory-format-design.md) markdown with YAML frontmatter, versioned in S3; Postgres is a derived index. Retrieval is hybrid vector + full-text, fused by RRF.   |
+| **Identity** | `UserProfile` resolves an employee across connected systems by stable provider identity first, then exact verified company email. Names are never used as identity evidence.                                                                                                                      |
+| **Deploy**   | Agents, MCP endpoints, widgets, artifacts, and shares use the whole KB by default. An optional folder anchor can narrow a deployment without creating another copy of memory. Community ships the widget interface; hosted interface adapters live in Nimbase Cloud.                              |
 
 ### The exits
 
 | Surface           | Serves                                                    |
 | ----------------- | --------------------------------------------------------- |
-| `deploy agent`    | Employees in Slack or customers through a website widget  |
+| `deploy agent`    | Customers through a self-hosted website widget            |
 | `deploy mcp`      | Any AI client your team already uses, over OAuth          |
-| `deploy docs`     | Published documentation sites written from memory         |
 | `deploy artifact` | Anyone — a prompt becomes a rendered, shareable interface |
 
 ### Trust model
@@ -84,7 +83,6 @@ nimbase sync run --wait
 
 # Watch memory compile, then read it
 nimbase workspace status
-nimbase workspace plan pro
 nimbase workspace model google/gemini-2.5-flash
 nimbase memory search "SSO decision"
 nimbase memory get <nodeId>
@@ -97,9 +95,11 @@ nimbase deploy mcp create "Engineering" --folder engineering
 Every command takes `--json` for scripting and agent use, and `--workspace <slug>` to
 override the default. See the [CLI reference](./apps/cli/README.md) for the full surface.
 
-The [web app](https://nimbase.ai) handles login and the flows the CLI cannot
-reasonably provide. See [Building a connector](./docs/connectors.md) for the
-versioned protocol and SDK.
+The self-hosted web app handles login and the flows the CLI cannot reasonably
+provide. See [Building a connector](./docs/connectors.md) for the versioned
+protocol and SDK. Some Apache-licensed CLI commands also target optional
+Nimbase Cloud surfaces; the [self-hosting guide](./docs/self-hosting.md) lists
+the exact Community boundary.
 
 ## Status
 
@@ -147,7 +147,7 @@ S3-compatible storage, AI configuration, and authentication setup, read the
 ```sh
 # Requires: Node 22+, pnpm 10+
 pnpm install
-pnpm dev:next
+pnpm dev:community
 ```
 
 ```sh
@@ -155,7 +155,7 @@ pnpm -F nimbase build   # build the CLI
 pnpm typecheck          # full TS check (the Next build ignores TS errors)
 pnpm test               # test suites
 pnpm lint:fix           # auto-fix lint
-pnpm db:push            # Drizzle migrations
+pnpm db:push:community  # Drizzle schema for an exported POSTGRES_URL
 ```
 
 ## Roadmap
@@ -164,7 +164,7 @@ pnpm db:push            # Drizzle migrations
 - ☑ Compile: the gardener agent over a versioned OKF memory tree
 - ☑ Sync: versioned connector protocol, SDK, scheduling, retries, and ingestion
 - ☑ Company identity: stable user profiles across verified source identities
-- ☑ Deploy: Slack agents, MCP endpoints, docs sites, widgets, artifacts
+- ☑ Deploy: local agents, MCP endpoints, widgets, shares, and artifacts
 - ☑ CLI as the primary control plane
 - ☐ Provider ACL mirroring and the long-term governance model
 - ☐ Memory freshness and staleness signals
@@ -193,8 +193,9 @@ boundary. A license on one component does not change the license of another
 component merely because they communicate over Nimbase's API.
 
 Nimbase Cloud is the managed distribution: hosting, upgrades, operational
-reliability, and maintained first-party connectors. Community Edition contains
-the complete product core and a protocol for self-hosted or third-party
+reliability, maintained first-party connectors and interface adapters, billing,
+support tooling, and managed publishing. Community Edition contains the
+complete memory and harness core plus protocols for self-hosted or third-party
 connectors; it does not enforce cloud billing limits. See
 [self-hosting](./docs/self-hosting.md), [contributing](./CONTRIBUTING.md), and
 [the trademark policy](./TRADEMARKS.md).
@@ -213,7 +214,7 @@ read `CLAUDE.md` and `AGENTS.md`.
 ## Tech stack
 
 Next.js · React 19 · TypeScript · Tailwind v4 · shadcn/ui · tRPC · Drizzle · Postgres
-(Neon) · pgvector · Clerk · Vercel AI SDK · QStash · S3 · Stripe · Commander · Turborepo · pnpm
+(Neon) · pgvector · Clerk · Vercel AI SDK · Pi agent harness · QStash · S3 · Commander · Turborepo · pnpm
 
 ## Acknowledgments
 

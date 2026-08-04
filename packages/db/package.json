@@ -60,8 +60,6 @@
     "migrate:backfill-node-title:prod": "dotenv -e ../../.env.production -- tsx src/scripts/backfill-node-title.ts",
     "migrate:source-columns": "infisical run --env dev -- tsx src/scripts/apply-source-columns.ts",
     "migrate:source-columns:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-source-columns.ts",
-    "migrate:operator-audit": "infisical run --env dev -- tsx src/scripts/apply-operator-audit.ts",
-    "migrate:operator-audit:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-operator-audit.ts",
     "migrate:integrations": "infisical run --env dev -- tsx src/scripts/apply-integrations.ts",
     "migrate:integrations:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-integrations.ts",
     "migrate:widget-slug": "infisical run --env dev -- tsx src/scripts/apply-widget-slug.ts",

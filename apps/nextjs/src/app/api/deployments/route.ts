@@ -1,4 +1,3 @@
-import type { DeploymentPlatform } from "@acme/validators/cli";
 import {
   createDeployment,
   DeploymentControlError,
@@ -7,7 +6,6 @@ import {
 import { EntitlementError } from "@acme/api/entitlements";
 import { createDeploymentRequestSchema } from "@acme/validators/cli";
 
-import { slackConfigured } from "~/server/agent/adapters/slack";
 import { deploymentHttpResponse } from "~/server/agent/deployment-http";
 import {
   authorizeWorkspaceRequest,
@@ -49,13 +47,13 @@ export async function POST(request: Request): Promise<Response> {
   if (authorized.userId === null) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
-  if (
-    parsed.data.platform === "slack" &&
-    !platformConfigured(parsed.data.platform)
-  ) {
+  if (parsed.data.platform === "slack") {
     return Response.json(
-      { error: `${parsed.data.platform} OAuth is not configured` },
-      { status: 503 },
+      {
+        error:
+          "The Slack adapter is not included in Community Edition. Install your own interface adapter or use Nimbase Cloud.",
+      },
+      { status: 501 },
     );
   }
 
@@ -67,20 +65,17 @@ export async function POST(request: Request): Promise<Response> {
       name: parsed.data.name,
       instructions: parsed.data.instructions,
       targetFolderId: parsed.data.targetFolderId,
-      interface:
-        parsed.data.platform === "widget"
-          ? {
-              platform: "widget",
-              config: {
-                greeting: parsed.data.widget.greeting,
-                allowedDomains: parsed.data.widget.allowedDomains,
-                theme: {
-                  accent: parsed.data.widget.accent,
-                  position: parsed.data.widget.position,
-                },
-              },
-            }
-          : undefined,
+      interface: {
+        platform: "widget",
+        config: {
+          greeting: parsed.data.widget.greeting,
+          allowedDomains: parsed.data.widget.allowedDomains,
+          theme: {
+            accent: parsed.data.widget.accent,
+            position: parsed.data.widget.position,
+          },
+        },
+      },
     });
     const { id: agentId, ...publicDeployment } = deployment;
     return Response.json(
@@ -93,17 +88,6 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     return deploymentErrorResponse(error);
   }
-}
-
-// Partial so an unlisted platform fails closed as "not configured" rather than
-// 500ing on a missing entry. Add a key when a platform ships.
-const PLATFORM_CONFIGURED: Partial<Record<DeploymentPlatform, () => boolean>> =
-  {
-    slack: slackConfigured,
-  };
-
-function platformConfigured(platform: DeploymentPlatform): boolean {
-  return PLATFORM_CONFIGURED[platform]?.() ?? false;
 }
 
 function deploymentErrorResponse(error: unknown): Response {

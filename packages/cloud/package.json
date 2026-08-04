@@ -11,14 +11,6 @@
       "types": "./dist/s3.d.ts",
       "default": "./src/s3.ts"
     },
-    "./docs/project": {
-      "types": "./dist/docs/project.d.ts",
-      "default": "./src/docs/project.ts"
-    },
-    "./docs/curate": {
-      "types": "./dist/docs/curate.d.ts",
-      "default": "./src/docs/curate.ts"
-    },
     "./queue": {
       "types": "./dist/queue.d.ts",
       "default": "./src/queue.ts"

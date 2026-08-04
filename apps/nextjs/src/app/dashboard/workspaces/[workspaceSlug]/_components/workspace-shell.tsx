@@ -39,8 +39,7 @@ export function WorkspaceShell({
     () => initialSettingsSection ?? "general",
   );
 
-  // God-only sections can disappear mid-session (the operator query refetches
-  // and fails), so resolve against the live list and fall back to General.
+  // Resolve against the canonical list and fall back to General for stale URLs.
   const settingsSections = useSettingsSections();
   const settingsSection =
     settingsSections.find((s) => s.id === settingsSectionId) ?? GENERAL_SECTION;

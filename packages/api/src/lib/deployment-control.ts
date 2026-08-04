@@ -41,7 +41,7 @@ export interface DeploymentTarget {
   name: string | null;
   error: string | null;
   // Publishable widget route key used only by the HTTP adapter to build the
-  // embed snippet. Slack tenant route keys are never exposed here.
+  // embed snippet. Private adapter route keys are never exposed here.
   widgetPublicKey: string | null;
 }
 

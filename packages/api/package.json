@@ -11,10 +11,6 @@
       "types": "./dist/lib/access.d.ts",
       "default": "./src/lib/access.ts"
     },
-    "./operator": {
-      "types": "./dist/lib/operator.d.ts",
-      "default": "./src/lib/operator.ts"
-    },
     "./access-core": {
       "types": "./dist/lib/access-core.d.ts",
       "default": "./src/lib/access-core.ts"
@@ -26,10 +22,6 @@
     "./entitlements": {
       "types": "./dist/lib/entitlements.d.ts",
       "default": "./src/lib/entitlements.ts"
-    },
-    "./edition": {
-      "types": "./dist/lib/edition.d.ts",
-      "default": "./src/lib/edition.ts"
     },
     "./deployment-surfaces-control": {
       "types": "./dist/lib/deployment-surfaces-control.d.ts",
@@ -58,14 +50,6 @@
     "./workspace-ai-config": {
       "types": "./dist/lib/workspace-ai-config.d.ts",
       "default": "./src/lib/workspace-ai-config.ts"
-    },
-    "./plan-override": {
-      "types": "./dist/lib/plan-override.d.ts",
-      "default": "./src/lib/plan-override.ts"
-    },
-    "./plan-transition": {
-      "types": "./dist/lib/plan-transition.d.ts",
-      "default": "./src/lib/plan-transition.ts"
     }
   },
   "license": "AGPL-3.0-only",

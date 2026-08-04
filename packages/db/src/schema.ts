@@ -150,7 +150,6 @@ export const spendKindSchema = z.enum([
   "agent",
   "extract",
   "biographer",
-  "docsite",
 ]);
 export type SpendKind = z.infer<typeof spendKindSchema>;
 
@@ -770,7 +769,7 @@ export const SpendLedger = pgTable("spend_ledger", (t) => ({
     .notNull(),
 }));
 
-// --- ai_config: global, operator-level model/provider config (single row) ---
+// --- ai_config: installation-wide model/provider config (single row) ---
 export const aiProviderKindSchema = z.enum(["gateway", "openai-compatible"]);
 export type AiProviderKind = z.infer<typeof aiProviderKindSchema>;
 
@@ -1085,11 +1084,10 @@ export const AccessGrant = pgTable(
 );
 
 // --- agents: KB-backed personas deployable through external interfaces ---
-// Slack and Widget are interface adapters over the same Agent. Teams and
-// Discord are additive chat interfaces: add the member here, a
-// `@chat-adapter/*` adapter in `server/agent/bot.ts`, a `routeKeyFor` arm, and
-// an install/callback pair. This is unrelated to the out-of-process inbound
-// connector protocol below.
+// Widget is the built-in Community interface. The "slack" member stays in the
+// shared wire/schema contract so the Apache CLI can also target Nimbase Cloud;
+// Community does not ship the first-party Slack OAuth/webhook adapter. This is
+// unrelated to the out-of-process inbound connector protocol below.
 export const connectionPlatformSchema = z.enum(["slack", "widget"]);
 export type ConnectionPlatform = z.infer<typeof connectionPlatformSchema>;
 export const connectionStatusSchema = z.enum([
@@ -1478,200 +1476,5 @@ export const GroupMcp = pgTable(
       "group_mcp_artifact_visibility_check",
       sql`${table.artifactVisibility} in ('private', 'public')`,
     ),
-  ],
-);
-
-// --- doc_site: a published Nimbus documentation site over a memory slice ---
-//
-// A DocSite is the durable, multi-page sibling of an Artifact. Where an
-// Artifact is a one-shot generated HTML page built in-process, a doc site is a
-// static Astro build (cloudflare/nimbus) regenerated whenever its source
-// memory changes. It anchors directly to a folder, like Agent and GroupMcp.
-//
-// `live` is the only status that serves content: builds land in a fresh S3
-// prefix and `liveBuildId` flips atomically on success, so a failed rebuild
-// never replaces a site that is already up.
-export type DocSiteStatus = "draft" | "building" | "live" | "failed";
-// Who may read the published site. Mirrors ArtifactVisibility.
-export type DocSiteVisibility = "private" | "public";
-export const docSiteVisibilitySchema = z.enum([
-  "private",
-  "public",
-]) satisfies z.ZodType<DocSiteVisibility>;
-
-// Author-facing site configuration, projected into the generated
-// `defineNimbusConfig({...})` call at build time.
-export interface DocSiteConfig {
-  /** One-line description — Nimbus uses it for meta + OG tags. */
-  description?: string;
-  /** BCP-47 locale for the generated site. Defaults to "en". */
-  locale?: string;
-  /** Extra guidance for the curate pass (voice, reader needs, what to omit). */
-  instructions?: string;
-}
-
-export const DocSite = pgTable(
-  "doc_site",
-  (t) => ({
-    id: t.uuid().primaryKey().defaultRandom(),
-    workspaceId: t
-      .uuid("workspace_id")
-      .notNull()
-      .references(() => Workspace.id, { onDelete: "cascade" }),
-    folderId: t
-      .uuid("folder_id")
-      .references(() => WikiNode.id, { onDelete: "restrict" }),
-    // Stable workspace-scoped identifier; also the path segment the site is
-    // served under (docs.nimbase.ai/<workspace-slug>/<site-slug>).
-    slug: t.text().notNull(),
-    name: t.text().notNull(),
-    config: t.jsonb().$type<DocSiteConfig>(),
-    visibility: t
-      .text()
-      .notNull()
-      .$type<DocSiteVisibility>()
-      .default("private"),
-    status: t.text().notNull().$type<DocSiteStatus>().default("draft"),
-    // S3 prefix of the build currently being served. Null until the first
-    // successful build; only ever advanced by a build that finished.
-    liveBuildId: t.uuid("live_build_id"),
-    // Nimbus templates are pre-1.0 and change shape between minors, so every
-    // site pins the tag it was scaffolded from. Bumping is deliberate and
-    // per-site, never floating.
-    templateVersion: t.text("template_version").notNull(),
-    // Failure message from the last build; cleared when a build succeeds.
-    error: t.text(),
-    lastBuiltAt: t.timestamp("last_built_at", { withTimezone: true }),
-    createdByUserId: t.text("created_by_user_id"),
-    createdAt: t
-      .timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: t
-      .timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdate(() => new Date()),
-  }),
-  (table) => [
-    uniqueIndex("doc_site_workspace_slug_idx").on(
-      table.workspaceId,
-      table.slug,
-    ),
-    index("doc_site_workspace_idx").on(table.workspaceId),
-    index("doc_site_folder_idx").on(table.folderId),
-  ],
-);
-
-export type DocSiteBuildStatus =
-  | "queued"
-  | "projecting"
-  | "building"
-  | "succeeded"
-  | "failed";
-
-// One row per publish attempt — the audit trail behind a site's status, and
-// what the CLI's `--wait` polls.
-export const DocSiteBuild = pgTable(
-  "doc_site_build",
-  (t) => ({
-    id: t.uuid().primaryKey().defaultRandom(),
-    docSiteId: t
-      .uuid("doc_site_id")
-      .notNull()
-      .references(() => DocSite.id, { onDelete: "cascade" }),
-    workspaceId: t
-      .uuid("workspace_id")
-      .notNull()
-      .references(() => Workspace.id, { onDelete: "cascade" }),
-    status: t.text().notNull().$type<DocSiteBuildStatus>().default("queued"),
-    // Count of memory nodes that made it through the fence into the build.
-    // Zero is the signature of a broken fence, so it is worth recording.
-    pageCount: t.integer("page_count").notNull().default(0),
-    // Tail of the runner's output, kept for debugging failed builds.
-    log: t.text(),
-    error: t.text(),
-    triggeredByUserId: t.text("triggered_by_user_id"),
-    startedAt: t
-      .timestamp("started_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    finishedAt: t.timestamp("finished_at", { withTimezone: true }),
-  }),
-  (table) => [
-    index("doc_site_build_site_started_idx").on(
-      table.docSiteId,
-      table.startedAt,
-    ),
-  ],
-);
-
-// --- workspace_subscription: per-workspace Stripe billing (1:1 with workspace) ---
-export type BillingPlan = "free" | "pro" | "enterprise";
-export type BillingStatus =
-  | "trialing"
-  | "active"
-  | "past_due"
-  | "canceled"
-  | "unpaid"
-  | "incomplete"
-  | "incomplete_expired"
-  | "paused";
-
-export const WorkspaceSubscription = pgTable(
-  "workspace_subscription",
-  (t) => ({
-    workspaceId: t
-      .uuid("workspace_id")
-      .notNull()
-      .primaryKey()
-      .references(() => Workspace.id, { onDelete: "cascade" }),
-    plan: t.text().notNull().$type<BillingPlan>().default("free"), // free|pro|enterprise
-    status: t.text().$type<BillingStatus>(), // stripe sub status; null for free/enterprise-manual
-    stripeCustomerId: t.text("stripe_customer_id"),
-    stripeSubscriptionId: t.text("stripe_subscription_id"),
-    currentPeriodEnd: t.timestamp("current_period_end", { withTimezone: true }),
-    trialEnd: t.timestamp("trial_end", { withTimezone: true }),
-    cancelAtPeriodEnd: t
-      .boolean("cancel_at_period_end")
-      .default(false)
-      .notNull(),
-    createdAt: t
-      .timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    updatedAt: t
-      .timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  }),
-  (table) => [
-    uniqueIndex("workspace_subscription_stripe_sub_idx").on(
-      table.stripeSubscriptionId,
-    ),
-    index("workspace_subscription_stripe_customer_idx").on(
-      table.stripeCustomerId,
-    ),
-  ],
-);
-
-// --- operator_audit_log: one row per god-mode (operator) read of a workspace ---
-// operatorUserId is a Clerk user id; workspaceId is intentionally NOT a foreign
-// key so the audit trail survives workspace deletion (immutable record).
-export const OperatorAuditLog = pgTable(
-  "operator_audit_log",
-  (t) => ({
-    id: t.uuid().notNull().primaryKey().defaultRandom(),
-    operatorUserId: t.text("operator_user_id").notNull(),
-    workspaceId: t.uuid("workspace_id").notNull(),
-    action: t.text().notNull(),
-    createdAt: t
-      .timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  }),
-  (table) => [
-    index("operator_audit_log_workspace_idx").on(table.workspaceId),
-    index("operator_audit_log_operator_idx").on(table.operatorUserId),
   ],
 );

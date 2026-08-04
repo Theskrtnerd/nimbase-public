@@ -45,7 +45,7 @@ export interface AgentArtifactOptions {
  *
  * Deliberately narrower than the MCP `create_artifact`: no workspace, folder,
  * kind, theme, or visibility arguments. Everything that decides *exposure* is
- * fixed by the agent's admin-set configuration, so a prompt in a Slack channel
+ * fixed by the agent's admin-set configuration, so an external user prompt
  * can choose what the artifact says but never who can see it.
  */
 export function agentArtifactTools(opts: AgentArtifactOptions): ToolSet {

@@ -89,59 +89,6 @@ export async function publishArtifactGenerate(
   });
 }
 
-// A documentation-site build. Deliberately minimal: the fence is NOT in this
-// payload. `resolveDocSiteFence` derives it from the site's folder anchor at
-// job time, so no enqueue — from any surface, by any caller — can widen what a
-// published site contains.
-export const docSiteBuildJobSchema = z.object({
-  jobId: z.string(),
-  buildId: z.string(),
-  docSiteId: z.string(),
-  workspaceId: z.string(),
-});
-export type DocSiteBuildJobData = z.infer<typeof docSiteBuildJobSchema>;
-
-export async function publishDocSiteBuild(
-  data: DocSiteBuildJobData,
-): Promise<void> {
-  const base = process.env.NIMBASE_WEB_URL;
-  if (!base) throw new Error("NIMBASE_WEB_URL is not set");
-  await qstash().publishJSON({
-    url: `${base}/api/docsites/generate`,
-    body: data,
-    deduplicationId: data.jobId,
-    // A docs build fans out to an external runner and is expensive; a retry
-    // storm would queue duplicate builds behind each other for no benefit.
-    retries: 1,
-  });
-}
-
-export const agentTurnJobSchema = z.object({
-  jobId: z.string(),
-  connectionId: z.string(),
-  // Chat SDK thread id — the whole reply address in one opaque string
-  // ("slack:C123:1699.99"). Platform-prefixed and treated as opaque here, so a
-  // new platform needs no change to this payload. The worker rehydrates it with
-  // `bot.thread(threadId)`.
-  threadId: z.string(),
-  userText: z.string(),
-  externalUserId: z.string(),
-});
-export type AgentTurnJobData = z.infer<typeof agentTurnJobSchema>;
-
-export async function publishAgentTurn(data: AgentTurnJobData): Promise<void> {
-  const base = process.env.NIMBASE_WEB_URL;
-  if (!base) throw new Error("NIMBASE_WEB_URL is not set");
-  await qstash().publishJSON({
-    url: `${base}/api/agents/turn`,
-    body: data,
-    deduplicationId: data.jobId,
-    retries: 3,
-    // Serialize turns per connection so a channel can't trigger overlapping runs.
-    flowControl: { key: `agent-turn-${data.connectionId}`, parallelism: 1 },
-  });
-}
-
 export const crawlJobSchema = z.object({
   jobId: z.string(),
   runId: z.uuid(),
