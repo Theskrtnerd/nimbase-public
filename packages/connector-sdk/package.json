@@ -1,6 +1,6 @@
 {
   "name": "@nimbase/connector-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Wire contracts for building out-of-process Nimbase sync connectors",
   "type": "module",
   "homepage": "https://github.com/Theskrtnerd/nimbase-public/tree/main/packages/connector-sdk",
@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "zod": "^4.1.12"
+    "zod": "4.1.12"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",

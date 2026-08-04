@@ -540,8 +540,8 @@ importers:
   packages/connector-sdk:
     dependencies:
       zod:
-        specifier: ^4.1.12
-        version: 4.3.6
+        specifier: 4.1.12
+        version: 4.1.12
     devDependencies:
       '@acme/eslint-config':
         specifier: workspace:*
@@ -7795,9 +7795,6 @@ packages:
   zod@4.1.12:
     resolution: {integrity: sha512-JInaHOamG8pt5+Ey8kGmdcAcg3OL9reK8ltczgHTAwNhMys/6ThXHityHxVV2p3fkw/c+MAvBHFVYHFZDmjMCQ==}
 
-  zod@4.3.6:
-    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
-
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
@@ -9455,8 +9452,8 @@ snapshots:
     dependencies:
       '@opentelemetry/semantic-conventions': 1.41.1
       ws: 8.21.1(bufferutil@4.1.0)(utf-8-validate@6.0.4)
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.2(zod@4.3.6)
+      zod: 4.1.12
+      zod-to-json-schema: 3.25.2(zod@4.1.12)
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
     transitivePeerDependencies:
@@ -12520,8 +12517,8 @@ snapshots:
       '@babel/parser': 7.28.5
       eslint: 9.38.0(jiti@2.7.0)
       hermes-parser: 0.25.1
-      zod: 4.3.6
-      zod-validation-error: 4.0.2(zod@4.3.6)
+      zod: 4.1.12
+      zod-validation-error: 4.0.2(zod@4.1.12)
     transitivePeerDependencies:
       - supports-color
 
@@ -16338,18 +16335,12 @@ snapshots:
     dependencies:
       zod: 4.1.12
 
-  zod-to-json-schema@3.25.2(zod@4.3.6):
+  zod-validation-error@4.0.2(zod@4.1.12):
     dependencies:
-      zod: 4.3.6
-
-  zod-validation-error@4.0.2(zod@4.3.6):
-    dependencies:
-      zod: 4.3.6
+      zod: 4.1.12
 
   zod@3.25.76: {}
 
   zod@4.1.12: {}
-
-  zod@4.3.6: {}
 
   zwitch@2.0.4: {}
