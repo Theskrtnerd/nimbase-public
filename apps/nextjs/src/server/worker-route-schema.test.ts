@@ -28,7 +28,7 @@ describe("QStash worker route body schemas", () => {
 
       expect(source).toMatch(
         new RegExp(
-          `import \\{ ${schemaName} \\} from ["']@acme/cloud/queue["']`,
+          `import \\{ ${schemaName} \\} from ["']@acme/runtime/queue["']`,
         ),
       );
       expect(source).toContain(`const Body = ${schemaName};`);

@@ -1,18 +1,17 @@
 import "server-only";
 
-import type { BrainInitJobData } from "@acme/cloud";
+import type { BrainInitJobData } from "@acme/runtime/queue";
 import { buildAccessContext } from "@acme/api/access";
-import { toProviderContext } from "@acme/cloud";
+import { eq } from "@acme/db";
+import { db } from "@acme/db/client";
+import { Workspace } from "@acme/db/schema";
 import {
   COMPANY_MD_PATH,
   draftCompanyMd,
   enrichCompanyWebsite,
-} from "@acme/cloud/biographer";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
-import * as s3 from "@acme/cloud/s3";
-import { eq } from "@acme/db";
-import { db } from "@acme/db/client";
-import { Workspace } from "@acme/db/schema";
+} from "@acme/runtime/biographer";
+import { toProviderContext } from "@acme/runtime/memory";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
 
 import { ingestSource } from "~/server/ingest/ingest-source";
 
@@ -73,25 +72,6 @@ export async function runBrainInitJob(data: BrainInitJobData): Promise<void> {
             : {}),
         })
         .where(eq(Workspace.id, workspace.id));
-    }
-
-    // Brand data is optional and must never prevent workspace creation. Keep a
-    // local copy of the chosen logo so the product doesn't depend on a remote
-    // asset remaining available after onboarding.
-    if (enrichment.logoUrl) {
-      try {
-        const logo = await fetch(enrichment.logoUrl);
-        const contentType = logo.headers.get("content-type") ?? "image/svg+xml";
-        if (logo.ok && contentType.startsWith("image/")) {
-          await s3.putObject(
-            `workspaces/${workspace.id}/branding/logo`,
-            new Uint8Array(await logo.arrayBuffer()),
-            contentType,
-          );
-        }
-      } catch (err) {
-        console.error("[brain-init] logo download failed (continuing)", err);
-      }
     }
 
     const content = await draftCompanyMd({

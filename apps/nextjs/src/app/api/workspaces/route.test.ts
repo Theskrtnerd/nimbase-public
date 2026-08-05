@@ -103,7 +103,7 @@ describe("POST /api/workspaces", () => {
     );
   });
 
-  it("keeps Context.dev as the source for unspecified website fields", async () => {
+  it("keeps the website as the source for unspecified identity fields", async () => {
     const response = await POST(
       request({ website: "https://acme.example", title: "Acme Incorporated" }),
     );

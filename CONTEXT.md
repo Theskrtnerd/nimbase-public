@@ -6,7 +6,7 @@ decisions; historical plans do not override it.
 
 ## Canonical terms
 
-- **Workspace** — one company security and billing boundary.
+- **Workspace** — one company security boundary.
 - **UserProfile** — the stable employee identity inside a workspace. A Clerk
   account, verified email aliases, and provider subjects resolve to it.
 - **Source** — immutable captured evidence: the exact original plus normalized
@@ -21,8 +21,8 @@ decisions; historical plans do not override it.
 - **Held source** — provider evidence retained for authorized raw access but
   deliberately excluded from compilation until derived memory can preserve
   and evaluate changing policy safely.
-- **Deployment** — a serving surface over memory: agent, MCP, docs, or artifact.
-  Slack and widget are agent interfaces.
+- **Deployment** — a serving surface over memory: agent, MCP, widget, share, or
+  artifact.
 - **Folder anchor** — an optional legacy/path scope. It may narrow a deployment
   or capture but does not define company identity or provider authorization.
 
@@ -31,8 +31,7 @@ decisions; historical plans do not override it.
 1. Provider authorization is derived from the provider, never invented by a
    prompt, folder name, deployment, or admin role.
 2. Provider ACLs are applied before returning source metadata, raw evidence, or
-   retrieval candidates. Workspace admins and Nimbase operators do not bypass
-   restricted grants.
+   retrieval candidates. Workspace admins do not bypass restricted grants.
 3. Unknown, partial, or missing provider identity data fails closed.
 4. Policy changes re-fence existing source history and create new evidence even
    if content did not change.

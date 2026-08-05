@@ -25,7 +25,7 @@ export const COMMUNITY_LIMITS: PlanLimits = {
 };
 
 export function resolveEntitlements(_workspaceId: string): Promise<{
-  plan: "enterprise";
+  plan: "community";
   status: null;
   limits: PlanLimits;
   trialEnd: null;
@@ -33,7 +33,7 @@ export function resolveEntitlements(_workspaceId: string): Promise<{
   cancelAtPeriodEnd: false;
 }> {
   return Promise.resolve({
-    plan: "enterprise",
+    plan: "community",
     status: null,
     limits: COMMUNITY_LIMITS,
     trialEnd: null,

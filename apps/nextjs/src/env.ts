@@ -18,14 +18,18 @@ export const env = createEnv({
     POSTGRES_URL: z.url(),
     DESKTOP_AUTH_SECRET: z.string().min(32),
     NIMBASE_WEB_URL: z.url().default("http://localhost:3100"),
-    // Artifact render service (apps/artifact-renderer) turning a stored artifact
-    // into a PNG/PDF. Both optional and checked together: with either unset,
-    // png/pdf chat attachments degrade to posting the share link.
-    ARTIFACT_RENDERER_URL: z.url().optional(),
-    ARTIFACT_RENDERER_TOKEN: z.string().min(16).optional(),
     // Optional API key for a self-hosted OpenAI-compatible AI endpoint (used
     // only when the global ai_config providerKind is "openai-compatible").
     NIMBASE_AI_API_KEY: z.string().min(1).optional(),
+    // Operational safety limits, independent of Cloud plans or billing. A zero
+    // daily budget disables the spend gate for installations using free local
+    // models; request rate limiting remains enabled.
+    NIMBASE_AI_REQUESTS_PER_MINUTE: z.coerce.number().int().min(1).default(30),
+    NIMBASE_AI_DAILY_BUDGET_CENTS: z.coerce.number().int().min(0).default(2500),
+    NIMBASE_ALLOW_PRIVATE_CONNECTORS: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     QSTASH_TOKEN: z.string().min(1).optional(),
     QSTASH_CURRENT_SIGNING_KEY: z.string().min(1).optional(),
     QSTASH_NEXT_SIGNING_KEY: z.string().min(1).optional(),
@@ -53,11 +57,6 @@ export const env = createEnv({
     NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z
       .string()
       .default("/dashboard"),
-    // PostHog product analytics. Stays dark unless the key is set (see
-    // posthog-provider.tsx). HOST is the PostHog ingestion host used only to
-    // configure the same-origin `/ingest` reverse proxy (next.config.ts).
-    NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
-    NEXT_PUBLIC_POSTHOG_HOST: z.url().default("https://us.i.posthog.com"),
     NEXT_PUBLIC_NIMBASE_SOURCE_URL: z
       .url()
       .default("https://github.com/Theskrtnerd/nimbase-public"),
@@ -78,8 +77,6 @@ export const env = createEnv({
       process.env.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL,
     NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:
       process.env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL,
-    NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
-    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
     NEXT_PUBLIC_NIMBASE_SOURCE_URL: process.env.NEXT_PUBLIC_NIMBASE_SOURCE_URL,
     NEXT_PUBLIC_APP_HOST: process.env.NEXT_PUBLIC_APP_HOST,
   },

@@ -1,4 +1,4 @@
-import { crawlJobSchema } from "@acme/cloud/queue";
+import { crawlJobSchema } from "@acme/runtime/queue";
 
 import { runCrawlJob } from "~/server/crawl/run";
 import { verifyQstashSignature } from "~/server/qstash";

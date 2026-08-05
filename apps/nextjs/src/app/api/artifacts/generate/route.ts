@@ -1,4 +1,4 @@
-import { artifactGenerateJobSchema } from "@acme/cloud/queue";
+import { artifactGenerateJobSchema } from "@acme/runtime/queue";
 
 import { processArtifactGenerateJob } from "~/server/artifact/generate";
 import { verifyQstashSignature } from "~/server/qstash";

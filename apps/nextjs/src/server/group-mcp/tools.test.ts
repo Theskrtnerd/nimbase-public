@@ -21,11 +21,11 @@ vi.mock("~/server/mcp/result", () => ({
   errorResult: vi.fn(),
   toErrorMessage: vi.fn(),
 }));
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/memory", () => ({
   toProviderContext: vi.fn(),
   toSearchHit: vi.fn(),
 }));
-vi.mock("@acme/cloud/memory/wiki-pg-provider", () => ({
+vi.mock("@acme/runtime/memory/wiki-pg-provider", () => ({
   memoryProvider: { search: vi.fn() },
 }));
 

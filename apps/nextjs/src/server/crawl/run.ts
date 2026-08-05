@@ -6,8 +6,8 @@ import {
   jsonValueSchema,
 } from "@nimbase/connector-sdk";
 
-import type { CrawlJobData } from "@acme/cloud/queue";
 import type { SourceConnection as SourceConnectionRow } from "@acme/db/schema";
+import type { CrawlJobData } from "@acme/runtime/queue";
 import { EntitlementError } from "@acme/api/entitlements";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";

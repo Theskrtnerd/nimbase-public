@@ -2,17 +2,19 @@ import "server-only";
 
 import type { PathScope } from "@acme/api/access-core";
 import type {
-  CompileJobData,
   ReconcileCandidate,
   ResolvedAccessLike,
-} from "@acme/cloud";
+} from "@acme/runtime/memory";
+import type { CompileJobData } from "@acme/runtime/queue";
 import { prefixCovers } from "@acme/api/access-core";
-import { costFor, resolveModels, s3, toProviderContext } from "@acme/cloud";
-import { GardenerError } from "@acme/cloud/memory/wiki";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
 import { and, eq, isNull } from "@acme/db";
 import { db } from "@acme/db/client";
 import { CompileJob, Source, SpendLedger, WikiNode } from "@acme/db/schema";
+import { costFor, resolveModels } from "@acme/runtime/ai";
+import { toProviderContext } from "@acme/runtime/memory";
+import { GardenerError } from "@acme/runtime/memory/wiki";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
+import * as s3 from "@acme/runtime/s3";
 
 // The compile pipeline drives its writes through the shared MemoryProvider seam
 // (`memoryProvider.reconcile`) rather than the gardener directly, so the backend

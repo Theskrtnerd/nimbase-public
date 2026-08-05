@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { artifactRuntimeUrl } from "@acme/runtime/artifact-runtime";
+
 import { hasUnsafeScript, stripCodeFence } from "./sanitize";
 
 describe("stripCodeFence", () => {
@@ -19,9 +21,11 @@ describe("stripCodeFence", () => {
 });
 
 describe("hasUnsafeScript", () => {
-  it("allows the Tailwind CDN script", () => {
+  it("allows only the exact local Tailwind runtime script", () => {
     expect(
-      hasUnsafeScript('<script src="https://cdn.tailwindcss.com"></script>'),
+      hasUnsafeScript(
+        `<script src="${artifactRuntimeUrl("tailwind")}"></script>`,
+      ),
     ).toBe(false);
   });
   it("allows HTML with no scripts", () => {
@@ -34,5 +38,15 @@ describe("hasUnsafeScript", () => {
     expect(
       hasUnsafeScript('<script src="https://evil.example/x.js"></script>'),
     ).toBe(true);
+  });
+  it("rejects inline content on the allowed runtime tag", () => {
+    expect(
+      hasUnsafeScript(
+        `<script src="${artifactRuntimeUrl("tailwind")}">alert(1)</script>`,
+      ),
+    ).toBe(true);
+  });
+  it("rejects an unclosed script tag", () => {
+    expect(hasUnsafeScript("<script>alert(1)")).toBe(true);
   });
 });

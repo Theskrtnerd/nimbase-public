@@ -1,10 +1,9 @@
 packages:
-  - apps/artifact-renderer
   - apps/cli
   - apps/nextjs
   - packages/agents
   - packages/api
-  - packages/cloud
+  - packages/runtime
   - packages/connector-sdk
   - packages/db
   - packages/mdx

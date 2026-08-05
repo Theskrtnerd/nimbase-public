@@ -5,16 +5,6 @@ const jiti = createJiti(import.meta.url);
 // Import env files to validate at build time. Use jiti so we can load .ts files in here.
 await jiti.import("./src/env");
 
-// PostHog ingestion host + its static-asset sibling, used only to configure the
-// same-origin `/ingest` reverse proxy below (keeps analytics first-party and out
-// of ad-blocker reach). `us.i.posthog.com` -> `us-assets.i.posthog.com`.
-const posthogHost =
-  process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com";
-const posthogAssetsHost = posthogHost.replace(
-  /^(https:\/\/)([^.]+)\./,
-  "$1$2-assets.",
-);
-
 const sourceUrl =
   process.env.NEXT_PUBLIC_NIMBASE_SOURCE_URL ??
   "https://github.com/Theskrtnerd/nimbase-public";
@@ -39,10 +29,6 @@ const config = {
   /** We already do linting and typechecking as separate tasks in CI */
   typescript: { ignoreBuildErrors: true },
 
-  // Required for the PostHog reverse proxy: the API needs trailing-slash-exact
-  // paths preserved (e.g. /ingest/flags), so don't auto-redirect them.
-  skipTrailingSlashRedirect: true,
-
   async headers() {
     return [
       {
@@ -57,19 +43,6 @@ const config = {
         ],
       },
     ];
-  },
-
-  async rewrites() {
-    return {
-      beforeFiles: [],
-      afterFiles: [
-        {
-          source: "/ingest/static/:path*",
-          destination: `${posthogAssetsHost}/static/:path*`,
-        },
-        { source: "/ingest/:path*", destination: `${posthogHost}/:path*` },
-      ],
-    };
   },
 };
 

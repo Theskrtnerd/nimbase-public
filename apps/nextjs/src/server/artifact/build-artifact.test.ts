@@ -12,12 +12,16 @@ const mocks = vi.hoisted(() => ({
 }));
 
 // Same seams as generate.test.ts: there is no "~" alias under vitest, and the
-// real transpiler is covered canonically in packages/cloud/src/artifact-build.test.ts.
+// real transpiler is covered canonically in packages/runtime/src/artifact-build.test.ts.
 // What's under test here is the wiring — which failures become a repairable
 // ArtifactArtifactError, and what the model is told about them.
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/artifact-build", () => ({
   buildArtifactHtml: mocks.buildArtifactHtml,
+}));
+vi.mock("@acme/runtime/artifact-theme", () => ({
   ARTIFACT_THEME_HEAD: "<style>/* theme */</style>",
+}));
+vi.mock("@acme/runtime/artifact-mermaid", () => ({
   ARTIFACT_MERMAID_HEAD: "<script>/* mermaid */</script>",
   usesMermaid: (s: string) =>
     /class(?:Name)?\s*=\s*["'`][^"'`]*\bmermaid\b/.test(s),
@@ -96,15 +100,15 @@ describe("buildArtifactArtifact — freeform", () => {
     }
   });
 
-  it("injects the app theme after the Tailwind CDN tag", () => {
+  it("injects the app theme after the local Tailwind runtime tag", () => {
     mocks.hasUnsafeScript.mockReturnValue(false);
     const { html, source } = buildArtifactArtifact(
-      '<html><head><script src="https://cdn.tailwindcss.com"></script></head><body>x</body></html>',
+      '<html><head><script src="https://nimbase-artifact-runtime.invalid/api/artifact-runtime/tailwind"></script></head><body>x</body></html>',
       { kind: "freeform", useAppTheme: true },
     );
     expect(source).toBeNull();
     expect(html.indexOf("/* theme */")).toBeGreaterThan(
-      html.indexOf("cdn.tailwindcss.com"),
+      html.indexOf("nimbase-artifact-runtime.invalid"),
     );
   });
 

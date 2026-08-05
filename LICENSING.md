@@ -22,8 +22,8 @@ All other software in this repository is licensed under the GNU Affero General
 Public License, Version 3 only, unless a closer license file expressly states
 otherwise. This includes:
 
-- `apps/nextjs/` and `apps/artifact-renderer/`.
-- `packages/agents/`, `packages/api/`, `packages/cloud/`, `packages/db/`,
+- `apps/nextjs/`.
+- `packages/agents/`, `packages/api/`, `packages/runtime/`, `packages/db/`,
   `packages/mdx/`, and `packages/ui/`.
 - The repository's build and development tooling.
 

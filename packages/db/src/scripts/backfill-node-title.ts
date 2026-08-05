@@ -9,7 +9,7 @@
 //
 // The derivation below is a one-time migration convenience, not app logic —
 // the running app no longer derives titles from paths anywhere (every note
-// requires a real title at creation; see @acme/cloud/memory/wiki vfs.ts). This backfill just
+// requires a real title at creation; see @acme/runtime/memory/wiki vfs.ts). This backfill just
 // gives legacy rows (including permission-anchor "folder" rows, which the
 // NOT NULL constraint also covers even though nothing displays their title)
 // a reasonable starting value instead of leaving them null.

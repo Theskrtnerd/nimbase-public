@@ -1,10 +1,10 @@
 import "server-only";
 
 import { assertWithinLimit } from "@acme/api/entitlements";
-import { s3 } from "@acme/cloud";
 import { and, eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Source } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import { resolveCapturedByName } from "./ingest-source";
 

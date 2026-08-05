@@ -22,14 +22,14 @@ vi.mock("@acme/db/client", () => ({
     update: vi.fn(() => ({ set: mocks.updateSet })),
   },
 }));
-vi.mock("@acme/cloud", () => ({
-  s3: {
-    s3KeyFor: {
-      originalSource: mocks.originalSource,
-      rawMdSource: mocks.rawMdSource,
-    },
-    putObject: mocks.putObject,
+vi.mock("@acme/runtime/s3", () => ({
+  s3KeyFor: {
+    originalSource: mocks.originalSource,
+    rawMdSource: mocks.rawMdSource,
   },
+  putObject: mocks.putObject,
+}));
+vi.mock("@acme/runtime/raw-md", () => ({
   buildRawMd: mocks.buildRawMd,
 }));
 vi.mock("@acme/api/provider-access", () => ({

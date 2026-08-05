@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 
-import { s3 } from "@acme/cloud";
-import { indexNodeVersion } from "@acme/cloud/index-node-version";
 import { and, eq, sql } from "@acme/db";
 import { db } from "@acme/db/client";
 import { WikiNode, WikiNodeVersion } from "@acme/db/schema";
+import { indexNodeVersion } from "@acme/runtime/index-node-version";
+import * as s3 from "@acme/runtime/s3";
 
 import {
   authorizeWorkspaceRequest,

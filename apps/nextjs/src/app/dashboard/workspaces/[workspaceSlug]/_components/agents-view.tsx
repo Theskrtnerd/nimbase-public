@@ -5,7 +5,6 @@ import { useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { ArrowLeftIcon, Loader2Icon, SendIcon, Trash2Icon } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 
 import type { ArtifactVisibility } from "@acme/db/schema";
 import { cn } from "@acme/ui";
@@ -23,6 +22,7 @@ import {
 import { Switch } from "@acme/ui/switch";
 import { Textarea } from "@acme/ui/textarea";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { useTRPC } from "~/trpc/react";
 
 const ROOT_OPTION = "__root__";
@@ -36,7 +36,7 @@ export function CreateAgentForm({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
   const [folder, setFolder] = useState(ROOT_OPTION);
@@ -46,7 +46,7 @@ export function CreateAgentForm({
   const create = useMutation(
     trpc.agent.create.mutationOptions({
       onSuccess: async (res) => {
-        posthog.capture("agent_created", {
+        analytics.capture("agent_created", {
           workspace_id: workspaceId,
           has_instructions: instructions.trim().length > 0,
           scoped_to_folder: folder !== ROOT_OPTION,

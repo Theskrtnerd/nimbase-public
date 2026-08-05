@@ -33,7 +33,7 @@
     "ui-add": "turbo run ui-add",
     "prepare": "husky",
     "start:community": "pnpm -F @acme/nextjs exec next start --port 3100",
-    "eval": "pnpm --filter @acme/cloud eval",
+    "eval": "pnpm --filter @acme/runtime eval",
     "doctor": "npx react-doctor@latest"
   },
   "devDependencies": {

@@ -64,8 +64,8 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
-    "@acme/cloud": "workspace:*",
     "@acme/db": "workspace:*",
+    "@acme/runtime": "workspace:*",
     "@trpc/server": "11.18.0",
     "superjson": "2.2.3",
     "zod": "catalog:"

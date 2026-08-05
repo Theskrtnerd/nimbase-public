@@ -1,4 +1,4 @@
-import { brainInitJobSchema } from "@acme/cloud/queue";
+import { brainInitJobSchema } from "@acme/runtime/queue";
 
 import { runBrainInitJob } from "~/server/brain/init";
 import { verifyQstashSignature } from "~/server/qstash";

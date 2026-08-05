@@ -15,7 +15,9 @@ vi.mock("~/env", () => ({
     },
   },
 }));
-vi.mock("@acme/cloud", () => ({ publishCompile: mocks.publishCompile }));
+vi.mock("@acme/runtime/queue", () => ({
+  publishCompile: mocks.publishCompile,
+}));
 vi.mock("./process", () => ({ processCompileJob: mocks.processCompileJob }));
 
 const data = { jobId: "j1", workspaceId: "w1", sourceId: "s1" };

@@ -1,4 +1,5 @@
 import { agentDefinition } from "@acme/agents";
+import { artifactRuntimeUrl } from "@acme/runtime/artifact-runtime";
 
 // Diagrams, in both modes. The loader is spliced in server-side whenever the
 // artifact contains a `mermaid` class (see artifact-mermaid.ts), so the model
@@ -8,7 +9,7 @@ const MERMAID_GUIDANCE = `For flowcharts, sequence, ER, state, gantt, or mindmap
 
 // Freeform: a single self-contained HTML document (matches the legacy share flow).
 export const ARTIFACT_FREEFORM_SYSTEM = `Produce a single self-contained HTML document.
-Use Tailwind via CDN (<script src="https://cdn.tailwindcss.com"></script>).
+Use the local Tailwind runtime (<script src="${artifactRuntimeUrl("tailwind")}"></script>).
 Inline all data. No other <script> tags, no external JS, no React.
 ${MERMAID_GUIDANCE}
 Output ONLY the HTML document starting with <!doctype html>.`;
@@ -45,7 +46,7 @@ export function themeInstruction(
   if (mode === "custom") {
     const desc = description?.trim();
     if (desc) {
-      return `THEME & STYLING:\n${desc}\nLoad any fonts you reference via a Google Fonts <link>.`;
+      return `THEME & STYLING:\n${desc}\nUse system fonts; do not load external fonts or stylesheets.`;
     }
   }
   return `THEME & STYLING:\n${NIMBASE_THEME}`;
@@ -72,7 +73,7 @@ Rules:
 - Use Tailwind utility classes for styling.
 - Presentational + client-side interactivity ONLY (useState/useMemo, tabs, charts).
 - NO data fetching, NO fetch/XHR, NO network, NO server access, NO localStorage.
-- You MAY render a single <link rel="stylesheet"> to Google Fonts for typography (React hoists it) — this is the only allowed network reference.
+- Use system fonts. Do not render external scripts, fonts, stylesheets, images, or other network references.
 - Inline all data as literals.
 - ${MERMAID_GUIDANCE} In TSX put the source in a template literal child: {\`graph TD; A --> B;\`}.
 ${TSX_SYNTAX_RULES}

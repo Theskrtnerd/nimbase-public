@@ -22,9 +22,9 @@
   "dependencies": {
     "@acme/agents": "workspace:*",
     "@acme/api": "workspace:*",
-    "@acme/cloud": "workspace:*",
     "@acme/db": "workspace:*",
     "@acme/mdx": "workspace:*",
+    "@acme/runtime": "workspace:*",
     "@acme/ui": "workspace:*",
     "@acme/validators": "workspace:*",
     "@ai-sdk/react": "^4.0.12",
@@ -50,7 +50,6 @@
     "motion": "^12.38.0",
     "next": "^16.2.12",
     "pg": "^8.22.0",
-    "posthog-js": "^1.399.2",
     "react": "catalog:react19",
     "react-dom": "catalog:react19",
     "react-force-graph-2d": "^1.29.1",

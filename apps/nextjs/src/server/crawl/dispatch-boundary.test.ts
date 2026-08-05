@@ -21,8 +21,8 @@ describe("crawl dispatcher import boundaries", () => {
     (file) => {
       const source = readFileSync(join(import.meta.dirname, file), "utf8");
 
-      expect(source).not.toMatch(/from ["']@acme\/cloud["']/);
-      expect(source).toMatch(/from ["']@acme\/cloud\/queue["']/);
+      expect(source).not.toMatch(/from ["']@acme\/runtime["']/);
+      expect(source).toMatch(/from ["']@acme\/runtime\/queue["']/);
       expect(source).not.toMatch(/^import \{ runCrawlJob \} from ["']\.\//m);
       expect(source).toMatch(/await import\(["']\.\//);
     },

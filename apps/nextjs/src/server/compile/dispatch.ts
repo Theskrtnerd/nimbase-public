@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { CompileJobData } from "@acme/cloud";
-import { publishCompile } from "@acme/cloud";
+import type { CompileJobData } from "@acme/runtime/queue";
+import { publishCompile } from "@acme/runtime/queue";
 
 import { env } from "~/env";
 import { processCompileJob } from "./process";

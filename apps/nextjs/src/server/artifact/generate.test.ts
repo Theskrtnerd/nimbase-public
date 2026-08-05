@@ -28,16 +28,11 @@ vi.mock("@acme/db/client", () => ({
     insert: vi.fn(() => ({ values: mocks.insertValues })),
   },
 }));
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/artifact-build", () => ({
   buildArtifactHtml: mocks.buildArtifactHtml,
+}));
+vi.mock("@acme/runtime/ai", () => ({
   traceGeneration: mocks.traceGeneration,
-  ARTIFACT_THEME_HEAD: "<style>/* theme */</style>",
-  ARTIFACT_MERMAID_HEAD: "<script>/* mermaid */</script>",
-  // Mirrors the real predicate; its own edge cases are covered canonically in
-  // packages/cloud/src/artifact-mermaid.test.ts. Here it only needs to be
-  // faithful enough to exercise the freeform injection branch.
-  usesMermaid: (s: string) =>
-    /class(?:Name)?\s*=\s*["'`][^"'`]*\bmermaid\b/.test(s),
   resolveModels: () =>
     Promise.resolve({
       chat: {
@@ -46,24 +41,24 @@ vi.mock("@acme/cloud", () => ({
       },
     }),
   // Faithful to the registry's sonnet pricing (300/1500 cents per MTok); exact
-  // math is covered by packages/cloud/src/ai/cost.test.ts.
+  // math is covered by packages/runtime/src/ai/cost.test.ts.
   costFor: (_id: string, u: { inputTokens: number; outputTokens: number }) =>
     Math.round((u.inputTokens * 300 + u.outputTokens * 1500) / 1_000_000),
-  s3: {
-    s3KeyFor: {
-      artifactHtml: (w: string, id: string) =>
-        `workspaces/${w}/artifactes/${id}.html`,
-      artifactSource: (w: string, id: string) =>
-        `workspaces/${w}/artifactes/${id}.tsx`,
-    },
-    putObject: mocks.putObject,
-    getObjectText: vi.fn(),
-  },
 }));
-vi.mock("@acme/cloud/memory/wiki", () => ({
+vi.mock("@acme/runtime/s3", () => ({
+  s3KeyFor: {
+    artifactHtml: (w: string, id: string) =>
+      `workspaces/${w}/artifactes/${id}.html`,
+    artifactSource: (w: string, id: string) =>
+      `workspaces/${w}/artifactes/${id}.tsx`,
+  },
+  putObject: mocks.putObject,
+  getObjectText: vi.fn(),
+}));
+vi.mock("@acme/runtime/memory/wiki", () => ({
   WikiReadFs: class {},
 }));
-vi.mock("@acme/cloud/harness", () => ({
+vi.mock("@acme/runtime/harness", () => ({
   runHarnessAgent: mocks.runHarnessAgent,
   buildHarnessMounts: () => ({ fs: {}, readOutput: mocks.readOutput }),
   kbSearchTool: () => ({ search: {} }),
@@ -146,7 +141,9 @@ describe("processArtifactGenerateJob", () => {
 
     expect(mocks.putObject).toHaveBeenCalledWith(
       "workspaces/ws-1/artifactes/artifact-1.html",
-      expect.stringContaining("/* mermaid */"),
+      expect.stringContaining(
+        "https://nimbase-artifact-runtime.invalid/api/artifact-runtime/mermaid",
+      ),
       "text/html",
     );
   });

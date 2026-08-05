@@ -1,10 +1,10 @@
 import "server-only";
 
-import type { ExtractJobData } from "@acme/cloud";
+import type { ExtractJobData } from "@acme/runtime/queue";
 import { assertWithinLimit } from "@acme/api/entitlements";
-import { s3 } from "@acme/cloud";
 import { db } from "@acme/db/client";
 import { Source } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import type { ExpandZipResult } from "./zip-entries";
 import { selectZipEntries } from "./zip-entries";

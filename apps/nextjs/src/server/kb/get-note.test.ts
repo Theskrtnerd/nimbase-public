@@ -14,11 +14,11 @@ const h = vi.hoisted(() => {
   };
 });
 
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/memory", () => ({
   toProviderContext: () => ({}),
   ToolsetForbiddenError: h.ToolsetForbiddenError,
 }));
-vi.mock("@acme/cloud/memory/wiki-pg-provider", () => ({
+vi.mock("@acme/runtime/memory/wiki-pg-provider", () => ({
   memoryProvider: { fetch: h.fetchMock },
 }));
 vi.mock("@acme/api/node-metadata", () => ({

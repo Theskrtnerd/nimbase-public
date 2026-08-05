@@ -2,7 +2,7 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { modelsForRole } from "@acme/cloud";
+import { modelsForRole } from "@acme/runtime/ai";
 
 import { assertAdmin } from "../lib/access";
 import {

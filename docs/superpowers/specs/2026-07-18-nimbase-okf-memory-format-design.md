@@ -26,11 +26,11 @@ gray-matter parse in `knowledge-graph.ts`).
 | --- | --- |
 | JSON datasets | Convert to OKF markdown concepts (`type: Dataset`); delete the JSON write path |
 | Source of truth | **Frontmatter canonical** — the S3 `.md` body is truth; Postgres is a derived index recomputed on write |
-| Schema home | `packages/cloud/src/memory/okf/` (new module: `schema.ts` + `codec.ts`) |
+| Schema home | `packages/runtime/src/memory/okf/` (new module: `schema.ts` + `codec.ts`) |
 | Migration | Notes upgrade lazily on next write; datasets get a one-off conversion script |
 | `sources` field | New frontmatter list, bi-directional with `wiki_node_source` provenance |
 
-## 1. Schema module — `packages/cloud/src/memory/okf/`
+## 1. Schema module — `packages/runtime/src/memory/okf/`
 
 The single source of truth for the format. Two files:
 
@@ -76,7 +76,7 @@ the future bundle-export feature (NOT-88) can rewrite them to portable links.
 ## 2. Write path
 
 Every mutation already funnels through `GardenerFs.writeVersion`
-(`packages/cloud/src/memory/wiki/vfs.ts:712`). It gains the codec pipeline:
+(`packages/runtime/src/memory/wiki/vfs.ts:712`). It gains the codec pipeline:
 **parse → validate (strict on write) → stamp** (`timestamp`, default `type`, `sources`
 union) **→ re-serialize deterministically → persist to S3 → project to DB** (title,
 kind, summary, tag reindex, `wiki_node_source` sync) — all in one place.

@@ -23,10 +23,7 @@ export function registerWorkspaceCreate(program: Command): void {
   program
     .command("create")
     .description("Create a workspace from its website or explicit identity")
-    .argument(
-      "[website]",
-      "company website; Context.dev derives the title and description",
-    )
+    .argument("[website]", "HTTPS company website used to seed company.md")
     .option("--title <text>", "company title; overrides website-derived title")
     .option(
       "--description <text>",
@@ -111,7 +108,7 @@ export function registerWorkspaceCreate(program: Command): void {
           );
           if ("website" in input) {
             printLine(
-              "Nimbase is enriching unspecified company identity from Context.dev, then preparing company.md.",
+              "Nimbase is reading the company website and preparing company.md.",
             );
           } else {
             printLine("Nimbase is preparing company.md in the background.");

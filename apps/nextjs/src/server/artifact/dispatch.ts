@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { ArtifactGenerateJobData } from "@acme/cloud";
-import { publishArtifactGenerate } from "@acme/cloud";
+import type { ArtifactGenerateJobData } from "@acme/runtime/queue";
+import { publishArtifactGenerate } from "@acme/runtime/queue";
 
 import { env } from "~/env";
 import { processArtifactGenerateJob } from "./generate";

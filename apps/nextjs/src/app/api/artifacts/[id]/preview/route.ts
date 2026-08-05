@@ -1,7 +1,7 @@
-import { s3 } from "@acme/cloud";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Artifact } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import {
   authorizeWorkspaceRequest,
@@ -9,6 +9,7 @@ import {
 } from "~/server/auth/authorize-workspace";
 import { resolveTargetFolderPath } from "~/server/folders";
 import { invalidIdTextResponse, isUuidParam } from "~/server/http/params";
+import { serveShareHtml } from "~/server/share/serve-share-html";
 
 export const runtime = "nodejs";
 
@@ -56,11 +57,9 @@ export async function GET(
   if (!artifact.s3KeyHtml) return new Response("Not ready", { status: 404 });
 
   const html = await s3.getObjectText(artifact.s3KeyHtml);
-  return new Response(html, {
-    status: 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-    },
+  const response = serveShareHtml(html, {
+    runtimeOrigin: new URL(req.url).origin,
   });
+  response.headers.set("cache-control", "no-store");
+  return response;
 }

@@ -21,8 +21,9 @@ topology.
 - An OpenAI-compatible endpoint with chat and 1536-dimensional embedding
   models, or a Vercel AI Gateway key
 
-Clerk is the authentication adapter in the first Community release. QStash,
-Langfuse, Resend, and document parsing are optional.
+Clerk is the authentication adapter in the first Community release. QStash and
+Langfuse are optional. Rich document parsing is a hosted adapter; Community
+keeps the original file and a metadata-only note for unsupported formats.
 
 ## Quick start
 
@@ -57,6 +58,11 @@ export AGENT_CONNECTION_SECRET=replace-with-at-least-32-random-characters
 export CLERK_SECRET_KEY=replace-with-a-clerk-secret-key
 export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=replace-with-a-clerk-publishable-key
 export NEXT_PUBLIC_NIMBASE_SOURCE_URL=https://github.com/Theskrtnerd/nimbase-public
+
+# Operational AI safety limits (set 0 only for the daily spend gate when using
+# a free local model; the request-rate gate always remains enabled).
+export NIMBASE_AI_REQUESTS_PER_MINUTE=30
+export NIMBASE_AI_DAILY_BUDGET_CENTS=2500
 ```
 
 Set `NEXT_PUBLIC_NIMBASE_SOURCE_URL` to the source for the exact revision you
@@ -113,6 +119,7 @@ NIMBASE_API_URL=http://localhost:3100 nimbase auth login
 | CLI, REST/tRPC, MCP, widgets, artifacts, shares | Nimbase's Slack OAuth/webhook adapter      |
 | Generic connector SDK, sync worker, scheduler   | Maintained first-party provider connectors |
 | Signed or inline background jobs                | Managed docs-site builder and publishing   |
+| HTML artifact downloads                         | Managed PNG/PDF rendering                  |
 
 The Apache-licensed CLI and validator packages intentionally retain wire
 contracts used by both Community and Nimbase Cloud. Consequently, commands
@@ -124,6 +131,17 @@ For continuous sync, build an out-of-process provider adapter with
 `@nimbase/connector-sdk`; see [Building a connector](./connectors.md). Community
 owns schedules, retries, cursor persistence, ingestion, and permission fences,
 while your connector owns provider credentials and API behavior.
+
+The server also exposes an `ArtifactFileRenderer` adapter seam. Community
+serves sandboxed HTML and can attach that HTML directly; a distribution may
+provide its own isolated PNG/PDF renderer without placing browser-execution
+code in the Community runtime.
+
+Connector endpoints must use public HTTPS by default. If an installation
+deliberately runs connectors on a private network, set
+`NIMBASE_ALLOW_PRIVATE_CONNECTORS=true`; this relaxes the private-address and
+HTTP protections for connector requests only, so enable it only on a network
+whose connector endpoints you trust.
 
 ## Background jobs
 

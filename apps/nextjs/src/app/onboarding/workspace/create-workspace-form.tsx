@@ -3,7 +3,6 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 
 import { CreateWorkspaceSchema } from "@acme/db/schema";
 import { Button } from "@acme/ui/button";
@@ -31,7 +30,6 @@ export function CreateWorkspaceForm({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
   const [formError, setFormError] = useState<string | null>(null);
 
   const createWorkspace = useMutation(trpc.workspace.create.mutationOptions());
@@ -67,13 +65,11 @@ export function CreateWorkspaceForm({
       toast.error("Failed to create workspace");
       return;
     }
-    posthog.capture("workspace_created", { workspace_id: workspace.id });
     await queryClient.invalidateQueries(trpc.workspace.pathFilter());
     toast.success("Workspace created");
 
-    // Brain init runs server-side: it enriches this company from Context.dev,
-    // drafts company.md, and saves the discovered logo without holding up the
-    // rest of onboarding.
+    // Brain init safely reads the website and drafts company.md without holding
+    // up the rest of onboarding.
     onCreated({ id: workspace.id, slug: workspace.slug });
   };
 

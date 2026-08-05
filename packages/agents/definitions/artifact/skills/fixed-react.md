@@ -16,8 +16,8 @@ Rules:
   charts).
 - NO data fetching, NO fetch/XHR, NO network, NO server access, NO
   localStorage.
-- You MAY render a single `<link rel="stylesheet">` to Google Fonts for
-  typography (React hoists it) — this is the only allowed network reference.
+- Use system fonts. Do not load external scripts, fonts, stylesheets, images,
+  or other network resources.
 - Inline all data as literals.
 - For flowcharts, sequence, ER, state, gantt, or mindmap diagrams, write
   mermaid: an element with `className="mermaid"` whose text content is the

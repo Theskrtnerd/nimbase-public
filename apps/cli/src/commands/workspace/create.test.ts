@@ -124,7 +124,7 @@ describe("workspace creation output", () => {
     ]);
 
     expect(mocks.printLine).toHaveBeenCalledWith(
-      "Nimbase is enriching unspecified company identity from Context.dev, then preparing company.md.",
+      "Nimbase is reading the company website and preparing company.md.",
     );
   });
 

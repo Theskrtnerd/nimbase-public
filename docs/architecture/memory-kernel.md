@@ -21,7 +21,7 @@ organizational memory to humans and AI systems. The product loop is
 ## The MemoryProvider seam
 
 Today, memory access is direct Drizzle SQL scattered across several call sites
-(`packages/cloud/src/search.ts`, `apps/nextjs/src/server/kb/*`,
+(`packages/runtime/src/search.ts`, `apps/nextjs/src/server/kb/*`,
 `packages/api/src/router/kb.ts`, `server/compile/vfs.ts`). There is exactly one
 backing implementation — a wiki/Postgres store that fuses an LLM-navigated
 folder tree (`WikiNode` + versioned `WikiNodeVersion` bodies in S3) with
@@ -29,7 +29,7 @@ vector + full-text retrieval (pgvector HNSW, fused via RRF).
 
 The **MemoryProvider seam** collapses those call sites behind one stable
 interface so the backend stays swappable and callers depend only on the
-contract. It lives in **`@acme/cloud/src/memory/`**:
+contract. It lives in **`@acme/runtime/src/memory/`**:
 
 - `node.ts` — `MemoryNode`, the format-agnostic contract DTO (NOT the Drizzle
   row), plus `SourceRef`/`Span` provenance types.
@@ -71,9 +71,9 @@ These are LOCKED. Do not re-litigate; full rationale lives in the Linear project
    string union so a future finer grain can join without a v2 contract (fact
    extraction is a backlog spike, NOT-69).
 
-2. **`@acme/cloud` is the seam package.** `packages/api` already depends on
-   `@acme/cloud`, and the provider needs the S3/search/embed primitives that live
-   there. `@acme/cloud` must NOT depend on `@acme/api`; the access-context mapper
+2. **`@acme/runtime` is the seam package.** `packages/api` already depends on
+   `@acme/runtime`, and the provider needs the S3/search/embed primitives that live
+   there. `@acme/runtime` must NOT depend on `@acme/api`; the access-context mapper
    therefore takes a minimal **structural** input (`ResolvedAccessLike`) that
    restates only the fields it reads from access.ts, which stays the source of
    truth.

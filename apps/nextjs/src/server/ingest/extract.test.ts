@@ -13,9 +13,6 @@ const mocks = vi.hoisted(() => ({
   buildRawMd: vi.fn(() => "---\nkind: screenshot\n---\n\nextracted"),
   costFor: vi.fn(() => 0),
   extractBinaryText: vi.fn(),
-  parseBytes: vi.fn(),
-  isParseableMime: vi.fn(() => false),
-  parseConfigured: vi.fn(() => false),
   dispatchCompile: vi.fn(),
   expandZipSource: vi.fn(),
 }));
@@ -37,18 +34,19 @@ vi.mock("@acme/db/client", () => ({
     insert: vi.fn(() => ({ values: mocks.insertValues })),
   },
 }));
-vi.mock("@acme/cloud", () => ({
-  s3: {
-    s3KeyFor: { rawMdSource: mocks.rawMdSource },
-    getObjectBytes: mocks.getObjectBytes,
-    putObject: mocks.putObject,
-  },
+vi.mock("@acme/runtime/s3", () => ({
+  s3KeyFor: { rawMdSource: mocks.rawMdSource },
+  getObjectBytes: mocks.getObjectBytes,
+  putObject: mocks.putObject,
+}));
+vi.mock("@acme/runtime/raw-md", () => ({
   buildRawMd: mocks.buildRawMd,
+}));
+vi.mock("@acme/runtime/ai", () => ({
   costFor: mocks.costFor,
+}));
+vi.mock("@acme/runtime/normalize", () => ({
   extractBinaryText: mocks.extractBinaryText,
-  parseBytes: mocks.parseBytes,
-  isParseableMime: mocks.isParseableMime,
-  parseConfigured: mocks.parseConfigured,
 }));
 vi.mock("~/server/compile/dispatch", () => ({
   dispatchCompile: mocks.dispatchCompile,
@@ -88,11 +86,6 @@ beforeEach(() => {
     usage: { inputTokens: 1000, outputTokens: 100 },
   });
   mocks.costFor.mockReturnValue(5);
-  // Reset explicitly: clearAllMocks drops recorded calls but keeps
-  // implementations, so a mockReturnValue(true) in the Context.dev describe
-  // would otherwise leak into every later test and reroute the AI path.
-  mocks.parseConfigured.mockReturnValue(false);
-  mocks.isParseableMime.mockReturnValue(false);
   mocks.dispatchCompile.mockResolvedValue(undefined);
   mocks.expandZipSource.mockResolvedValue({
     childCount: 3,
@@ -216,7 +209,6 @@ describe("processExtractJob", () => {
     await processExtractJob(JOB);
 
     expect(mocks.extractBinaryText).not.toHaveBeenCalled();
-    expect(mocks.parseBytes).not.toHaveBeenCalled();
     expect(mocks.buildRawMd).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.stringContaining(
@@ -228,136 +220,6 @@ describe("processExtractJob", () => {
       expect.objectContaining({ status: "queued" }),
     );
     expect(mocks.dispatchCompile).toHaveBeenCalled();
-  });
-
-  describe("Context.dev document extraction", () => {
-    const PDF_SOURCE = {
-      ...BASE_SOURCE,
-      kind: "file",
-      mimeType: "application/pdf",
-      originalFilename: "q3-report.pdf",
-    };
-
-    beforeEach(() => {
-      mocks.parseConfigured.mockReturnValue(true);
-      mocks.isParseableMime.mockReturnValue(true);
-      mocks.parseBytes.mockResolvedValue({
-        markdown: "# Q3 report\n\nRevenue grew.",
-        type: "pdf",
-        creditsConsumed: 1,
-        creditsRemaining: 4999,
-      });
-    });
-
-    it("parses a document into raw.md and records the extractor", async () => {
-      mocks.selectLimit.mockResolvedValue([PDF_SOURCE]);
-
-      await processExtractJob(JOB);
-
-      expect(mocks.parseBytes).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mimeType: "application/pdf",
-          extension: "pdf",
-        }),
-      );
-      // The document path is not an AI call, so it must not bill the workspace
-      // the way extractBinaryText does.
-      expect(mocks.extractBinaryText).not.toHaveBeenCalled();
-      expect(mocks.buildRawMd).toHaveBeenCalledWith(
-        expect.objectContaining({ body: "# Q3 report\n\nRevenue grew." }),
-      );
-      expect(mocks.updateSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: "queued",
-          metadata: expect.objectContaining({
-            extractedBy: "context.dev:pdf",
-          }) as unknown,
-        }),
-      );
-      expect(mocks.dispatchCompile).toHaveBeenCalled();
-    });
-
-    it("routes screenshots to parse instead of the AI extractor", async () => {
-      mocks.selectLimit.mockResolvedValue([{ ...BASE_SOURCE }]);
-
-      await processExtractJob(JOB);
-
-      expect(mocks.parseBytes).toHaveBeenCalled();
-      expect(mocks.extractBinaryText).not.toHaveBeenCalled();
-    });
-
-    it("keeps voice on the AI extractor — Context.dev has no audio path", async () => {
-      mocks.selectLimit.mockResolvedValue([
-        { ...BASE_SOURCE, kind: "voice", mimeType: "audio/webm" },
-      ]);
-
-      await processExtractJob(JOB);
-
-      expect(mocks.parseBytes).not.toHaveBeenCalled();
-      expect(mocks.extractBinaryText).toHaveBeenCalled();
-    });
-
-    it("degrades to the stub when parse fails, without failing the source", async () => {
-      mocks.selectLimit.mockResolvedValue([PDF_SOURCE]);
-      mocks.parseBytes.mockRejectedValue(new Error("context.dev 503"));
-
-      await expect(processExtractJob(JOB)).resolves.toEqual([]);
-
-      expect(mocks.buildRawMd).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.stringContaining(
-            "No text extraction available",
-          ) as unknown,
-        }),
-      );
-      expect(mocks.updateSet).not.toHaveBeenCalledWith(
-        expect.objectContaining({ status: "failed" }),
-      );
-      expect(mocks.dispatchCompile).toHaveBeenCalled();
-    });
-
-    it("degrades to the stub when parse returns empty markdown", async () => {
-      mocks.selectLimit.mockResolvedValue([PDF_SOURCE]);
-      mocks.parseBytes.mockResolvedValue({
-        markdown: "   \n ",
-        type: "pdf",
-        creditsConsumed: 1,
-        creditsRemaining: 4999,
-      });
-
-      await processExtractJob(JOB);
-
-      expect(mocks.buildRawMd).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.stringContaining(
-            "No text extraction available",
-          ) as unknown,
-        }),
-      );
-    });
-
-    it("falls back to the AI extractor for images when the key is unset", async () => {
-      mocks.parseConfigured.mockReturnValue(false);
-      mocks.selectLimit.mockResolvedValue([{ ...BASE_SOURCE }]);
-
-      await processExtractJob(JOB);
-
-      expect(mocks.parseBytes).not.toHaveBeenCalled();
-      expect(mocks.extractBinaryText).toHaveBeenCalled();
-    });
-
-    it("still decodes text-native files locally rather than spending a credit", async () => {
-      mocks.selectLimit.mockResolvedValue([
-        { ...BASE_SOURCE, kind: "file", mimeType: "text/markdown" },
-      ]);
-
-      await processExtractJob(JOB);
-
-      expect(mocks.parseBytes).not.toHaveBeenCalled();
-      expect(mocks.buildRawMd).toHaveBeenCalledWith(
-        expect.objectContaining({ body: "bytes" }),
-      );
-    });
   });
 
   it("marks the source failed and rethrows when the AI call itself fails", async () => {

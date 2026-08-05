@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   conflictUpdate: vi.fn(),
 }));
 
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/ai", () => ({
   getGlobalConfig: mocks.getGlobalConfig,
   isValidModelForRole: mocks.isValidModelForRole,
   modelsForRole: mocks.modelsForRole,

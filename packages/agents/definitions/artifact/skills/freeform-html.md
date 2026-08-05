@@ -8,7 +8,7 @@ Produce a single self-contained HTML document in `/output/artifact.html`.
 
 Rules:
 
-- Use Tailwind via CDN (`<script src="https://cdn.tailwindcss.com"></script>`).
+- Use the local Tailwind runtime (`<script src="https://nimbase-artifact-runtime.invalid/api/artifact-runtime/tailwind"></script>`).
 - Inline all data. No other `<script>` tags, no external JS, no React.
 - For flowcharts, sequence, ER, state, gantt, or mindmap diagrams, write
   mermaid: an element with `class="mermaid"` whose text content is the diagram

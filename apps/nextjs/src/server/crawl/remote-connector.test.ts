@@ -3,12 +3,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { remoteConnector } from "./remote-connector";
 
 const mocks = vi.hoisted(() => ({
-  lookup: vi.fn(() =>
-    Promise.resolve([{ address: "93.184.216.34", family: 4 as const }]),
-  ),
+  safeFetch: vi.fn<
+    (
+      url: URL,
+      init: {
+        headers?: Record<string, string>;
+        allowPrivateNetwork?: boolean;
+      },
+    ) => Promise<Response>
+  >(),
+  readResponseText:
+    vi.fn<(response: Response, maxBytes: number) => Promise<string>>(),
+  env: { NIMBASE_ALLOW_PRIVATE_CONNECTORS: false },
 }));
 
-vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
+vi.mock("@acme/runtime/safe-http", () => ({
+  safeFetch: mocks.safeFetch,
+  readResponseText: mocks.readResponseText,
+}));
+vi.mock("~/env", () => ({ env: mocks.env }));
 
 const context = {
   endpointUrl: "https://connector.example",
@@ -17,60 +30,56 @@ const context = {
 
 describe("remote connector adapter", () => {
   afterEach(() => {
+    mocks.env.NIMBASE_ALLOW_PRIVATE_CONNECTORS = false;
     vi.clearAllMocks();
-    vi.unstubAllGlobals();
   });
 
   it("fetches and validates the connector manifest without redirects", async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            protocolVersion: 1,
-            id: "example/issues",
-            label: "Example Issues",
-          }),
-        ),
-      ),
+    mocks.safeFetch.mockResolvedValue(new Response("{}"));
+    mocks.readResponseText.mockResolvedValue(
+      JSON.stringify({
+        protocolVersion: 1,
+        id: "example/issues",
+        label: "Example Issues",
+      }),
     );
-    vi.stubGlobal("fetch", fetchMock);
 
     await expect(remoteConnector.manifest(context)).resolves.toMatchObject({
       id: "example/issues",
     });
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    const [url, init] = mocks.safeFetch.mock.calls[0] ?? [];
     expect(url).toEqual(
       new URL("https://connector.example/.well-known/nimbase-connector.json"),
     );
-    expect(init?.redirect).toBe("error");
-    expect(new Headers(init?.headers).get("authorization")).toBe(
+    expect(init).toMatchObject({
+      redirect: "error",
+      allowPrivateNetwork: false,
+    });
+    expect(new Headers(init?.headers as HeadersInit).get("authorization")).toBe(
       "Bearer shared-secret",
     );
   });
 
-  it("rejects insecure non-local connector endpoints", async () => {
-    await expect(
-      remoteConnector.manifest({
-        endpointUrl: "http://connector.example",
-        secret: null,
+  it("passes the private-network opt-in only when the operator enables it", async () => {
+    mocks.env.NIMBASE_ALLOW_PRIVATE_CONNECTORS = true;
+    mocks.safeFetch.mockResolvedValue(new Response("{}"));
+    mocks.readResponseText.mockResolvedValue(
+      JSON.stringify({
+        protocolVersion: 1,
+        id: "example/issues",
+        label: "Example Issues",
       }),
-    ).rejects.toThrow("connector endpoint must use HTTPS");
-  });
-
-  it("rejects endpoints resolving to a private address", async () => {
-    mocks.lookup.mockResolvedValueOnce([
-      { address: "169.254.169.254", family: 4 },
-    ]);
-    await expect(remoteConnector.manifest(context)).rejects.toThrow(
-      "connector endpoint resolves to a non-public address",
+    );
+    await remoteConnector.manifest(context);
+    expect(mocks.safeFetch).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({ allowPrivateNetwork: true }),
     );
   });
 
   it("rejects malformed connector output", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ items: [] })))),
-    );
+    mocks.safeFetch.mockResolvedValue(new Response("{}"));
+    mocks.readResponseText.mockResolvedValue(JSON.stringify({ items: [] }));
     await expect(
       remoteConnector.pull(context, {
         protocolVersion: 1,
@@ -83,18 +92,12 @@ describe("remote connector adapter", () => {
   });
 
   it("stops reading a connector response beyond the byte limit", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response("x".repeat(12_000_001), {
-            headers: { "Content-Type": "application/json" },
-          }),
-        ),
-      ),
+    mocks.safeFetch.mockResolvedValue(new Response("{}"));
+    mocks.readResponseText.mockRejectedValue(
+      new Error("outbound response exceeds the size limit"),
     );
     await expect(remoteConnector.manifest(context)).rejects.toThrow(
-      "connector response exceeds the size limit",
+      "outbound response exceeds the size limit",
     );
   });
 });

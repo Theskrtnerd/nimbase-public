@@ -148,10 +148,7 @@ const workspaceDescriptionSchema = z.string().trim().min(1).max(280);
 const workspaceWebsiteSchema = z
   .url()
   .max(500)
-  .refine(
-    (website) => /^https?:\/\//i.test(website),
-    "website must use http or https",
-  );
+  .refine((website) => /^https:\/\//i.test(website), "website must use https");
 
 /**
  * A website provides the identity baseline. Explicit fields override the
@@ -350,6 +347,10 @@ export const docSiteBuildSchema = z.object({
 export type DocSiteBuildStatus = z.infer<typeof docSiteBuildSchema>;
 
 export const billingPlanSchema = z.enum(["free", "pro", "enterprise"]);
+export const workspaceEditionSchema = z.enum([
+  "community",
+  ...billingPlanSchema.options,
+]);
 
 export const setPlanRequestSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -486,7 +487,7 @@ export const workspaceStatusSchema = z.object({
     brainInitStatus: z.string(),
   }),
   plan: z.object({
-    id: billingPlanSchema,
+    id: workspaceEditionSchema,
     status: z.string().nullable(),
   }),
   memory: z.object({ compiled: z.number().int() }),

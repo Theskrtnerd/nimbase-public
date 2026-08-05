@@ -5,10 +5,10 @@ import { z } from "zod/v4";
 
 import type { PathScope } from "@acme/db";
 import type { GroupMcpTool } from "@acme/db/schema";
-import { resolveModels, traceGeneration } from "@acme/cloud";
-import { readTools, WikiReadFs } from "@acme/cloud/memory/wiki";
 import { GROUP_MCP_TOOLS } from "@acme/db/schema";
 import { slugifyName } from "@acme/db/slug";
+import { resolveModels, traceGeneration } from "@acme/runtime/ai";
+import { readTools, WikiReadFs } from "@acme/runtime/memory/wiki";
 
 // Turns an admin's free-text prompt into a pre-filled group-MCP `create`
 // payload by running the same agentic read-only KB loop as the Artifact

@@ -3,11 +3,11 @@
 The primary control plane for [Nimbase](https://nimbase.ai) — memory infrastructure
 for companies. Organized around the three stages of the memory lifecycle:
 
-| Pillar   | What it covers                                                         |
-| -------- | ---------------------------------------------------------------------- |
-| `sync`   | Out-of-process connectors that continuously feed memory                |
-| `memory` | Capturing into, searching, and reading company memory                  |
-| `deploy` | Serving memory — agents, MCP endpoints, docs sites, widgets, artifacts |
+| Pillar   | What it covers                                                 |
+| -------- | -------------------------------------------------------------- |
+| `sync`   | Out-of-process connectors that continuously feed memory        |
+| `memory` | Capturing into, searching, and reading company memory          |
+| `deploy` | Serving memory — agents, MCP endpoints, widgets, and artifacts |
 
 `auth`, `workspace`, and `doctor` sit alongside them as plumbing.
 
@@ -54,8 +54,7 @@ nimbase workspace create \
 
 nimbase workspace list             # the default is marked with *
 nimbase workspace use acme         # select by short workspace slug
-nimbase workspace status           # plan, memory, capture, and sync health
-nimbase workspace plan pro         # Nimbase Cloud
+nimbase workspace status           # edition, memory, capture, and sync health
 nimbase workspace model            # effective agent model + available choices
 nimbase workspace model google/gemini-2.5-flash
 nimbase workspace model --inherit  # return to the global default
@@ -103,7 +102,7 @@ nimbase memory capture --file ./notes.md --folder <folderUuid>
 Every deployment type uses the same creation shape:
 
 ```sh
-nimbase deploy <agent|artifact|docs|mcp> create <prompt>
+nimbase deploy <agent|artifact|mcp> create <prompt>
 ```
 
 The prompt is the primary name or intent for the deployment. Type-specific flags
@@ -111,10 +110,7 @@ configure its interface, tools, publication, or sharing behavior. Every create
 command accepts `--slug`; otherwise Nimbase derives a stable slug from the prompt.
 
 ```sh
-# Nimbase Cloud's first-party Slack interface
-nimbase deploy agent create "Support Assistant" --interface slack
-
-# The same agent model, delivered as an embeddable website interface
+# An agent delivered as an embeddable website interface
 nimbase deploy agent create "Support Widget" \
   --interface widget
 nimbase deploy agent list
@@ -127,14 +123,6 @@ nimbase deploy mcp create "Customer Support" \
 nimbase deploy mcp list
 nimbase deploy mcp get customer-support
 nimbase deploy mcp remove customer-support
-
-# Nimbase Cloud's managed documentation publisher
-nimbase deploy docs create "Acme Docs" --public
-nimbase deploy docs create "Engineering Docs" --folder engineering
-nimbase deploy docs publish acme-docs --wait
-nimbase deploy docs list
-nimbase deploy docs get acme-docs
-nimbase deploy docs remove acme-docs
 
 # A generated artifact
 nimbase deploy artifact create "a table of my open questions" --wait
@@ -199,7 +187,7 @@ Pagination is internal. `memory captures list`, `deploy artifact list`, and
 - **Two credential modes.** A browser session (`auth login`) is the human path.
   `NIMBASE_TOKEN` is the automation path, but it is folder-scoped and read-oriented:
   every administrative surface — `sync add`, all of `deploy`, `workspace create`,
-  `workspace model`, and `workspace plan` — requires a real session and fails
+  and `workspace model` — requires a real session and fails
   fast with exit code `4`.
 - **Connection vs capture.** A connection is a standing channel (`SourceConnection`);
   a capture is a single ingested item (`Source`). `sync get <id>` inspects the former,
@@ -209,46 +197,32 @@ Pagination is internal. `memory captures list`, `deploy artifact list`, and
   through `--secret-env`; the secret value is read from the named environment
   variable and is never stored in CLI configuration. `--interval` accepts
   300–2592000 seconds and defaults to daily.
-- `deploy agent create` supports `--interface slack` and `--interface widget`.
-  Slack completes its install in the browser. Widget works on any website by
-  default and prints a paste-ready embed snippet. Deployment slugs are generated
-  from agent names and remain stable if a name is later edited.
+- `deploy agent create --interface widget` works on any website by default and
+  prints a paste-ready embed snippet. Deployment slugs are generated from agent
+  names and remain stable if a name is later edited.
 - `workspace model <model-id>` changes the workspace chat-model override. Every
   deployed agent resolves that setting on its next turn; `--inherit` removes the
   override and returns to the global default.
-- `workspace plan <plan>` is idempotent and owner-only for normal users.
-  Free → Pro opens Stripe Checkout; an existing live subscription never opens a
-  second Checkout and uses the Stripe Billing Portal when recovery or a downgrade
-  is needed. Enterprise requests open the contact path. Nimbase staff use the same
-  command for audited direct overrides and receive a warning when a live Stripe
-  subscription could later overwrite the override. `--no-open` prints any next-step
-  URL without opening it.
 - `deploy mcp create` exposes OAuth only; API-key automation is intentionally
   unavailable in this release. Tools default to `search`, `get_note`, `list_sources`;
   `capture` and `create_artifact` are opt-in via `--tool`.
 - Every deployment has a bare slug within its type. Type-specific commands accept
   that slug; mixed deployment output also includes an unambiguous typed reference
-  such as `agent:support` or `docs:handbook`. Internal UUIDs remain available in
+  such as `agent:support` or `artifact:handbook`. Internal UUIDs remain available in
   JSON where applicable.
-- `deploy agent create`, `deploy artifact create`, `deploy docs create`, and
-  `deploy mcp create` use the whole centralized KB when `--folder` is omitted.
-  Agent and artifact folders are UUIDs; MCP and docs folders are memory paths.
+- `deploy agent create`, `deploy artifact create`, and `deploy mcp create` use
+  the whole centralized KB when `--folder` is omitted. Agent and artifact
+  folders are UUIDs; MCP folders are memory paths.
   `publish` rebuilds from current memory, and a failed build with `--wait` exits
   non-zero.
-- **Plan limits.** Widgets and docs sites are standing-count entitlements: Free allows
-  none, Pro allows 5 widgets and 3 docs sites, Enterprise is unlimited. Captures,
-  artifacts, members, and storage are metered too — creation fails with the limit in
-  the error message once a workspace is over.
-- Captures, synchronization, artifacts, and docs builds run asynchronously; pass
+- Captures, synchronization, and artifacts run asynchronously; pass
   `--wait` where supported or inspect their status separately.
-- Capture and agent/artifact `--folder` values are internal folder UUIDs. MCP and docs
+- Capture and agent/artifact `--folder` values are internal folder UUIDs. MCP
   `--folder` values are memory paths.
 - The CLI never edits notes — that surface doesn't exist in Nimbase's API.
-- `workspace create <website>` is the default creation path. Context.dev
-  populates the workspace title and description in the background before the
-  Biographer writes `company.md`. Without a website, pass both `--title` and
-  `--description`. With a website, either explicit field overrides its
-  Context.dev-derived value while unspecified fields still come from Context.dev.
+- `workspace create <website>` is the default creation path. Community safely
+  reads the HTTPS website to seed `company.md`; pass explicit `--title` and
+  `--description` when no website is available.
 
 ## License
 

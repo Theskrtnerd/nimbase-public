@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { CrawlJobData } from "@acme/cloud/queue";
-import { publishCrawl } from "@acme/cloud/queue";
+import type { CrawlJobData } from "@acme/runtime/queue";
+import { publishCrawl } from "@acme/runtime/queue";
 
 import { env } from "~/env";
 

@@ -2,29 +2,23 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import type { ExtractJobData } from "@acme/cloud";
 import type { SourceMetadata } from "@acme/db/schema";
-import {
-  buildRawMd,
-  costFor,
-  extractBinaryText,
-  isParseableMime,
-  parseBytes,
-  parseConfigured,
-  s3,
-} from "@acme/cloud";
+import type { ExtractJobData } from "@acme/runtime/queue";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { CompileJob, Source, SpendLedger } from "@acme/db/schema";
+import { costFor } from "@acme/runtime/ai";
+import { extractBinaryText } from "@acme/runtime/normalize";
+import { buildRawMd } from "@acme/runtime/raw-md";
+import * as s3 from "@acme/runtime/s3";
 
 import { dispatchCompile } from "~/server/compile/dispatch";
 import { expandZipSource } from "./expand-zip";
 import { buildArchiveManifest, isZipSource } from "./zip-entries";
 
 // "file" sources in this text-native mime set decode straight to raw.md — no
-// AI call, no vendor call. Richer formats (PDF, docx, xlsx, pptx, code, data,
-// images) go through Context.dev Parse; anything left over falls back to a
-// metadata-only raw.md, so capture still succeeds instead of failing.
+// AI call or vendor call. Richer document formats fall back to a metadata-only
+// raw.md in Community; hosted distributions can add an extraction adapter.
 const TEXT_NATIVE_MIME = new Set([
   "text/plain",
   "text/markdown",
@@ -41,44 +35,6 @@ const DEFAULT_MIME_FOR_KIND: Record<"screenshot" | "voice" | "video", string> =
 
 function noExtractionStub(mimeType: string | null): string {
   return `_No text extraction available for this file type (${mimeType ?? "unknown mime"}) yet — the original is stored and downloadable._`;
-}
-
-/**
- * Runs a captured document/image through Context.dev Parse, degrading to the
- * metadata-only stub when the service can't handle it. A source whose bytes
- * are safely stored should never end up "failed" because an extraction vendor
- * was down or rejected the format — the capture is still real, and a later
- * re-extract can fill in the body.
- */
-async function parseDocument(
-  source: typeof Source.$inferSelect,
-  bytes: Uint8Array,
-): Promise<{ body: string; extractedBy?: string }> {
-  try {
-    const result = await parseBytes({
-      data: bytes,
-      mimeType: source.mimeType ?? "application/octet-stream",
-      extension: extensionOf(source.originalFilename),
-    });
-    // An empty parse (e.g. an image with no text and nothing to describe) is
-    // worse than the stub: it would compile a note with no content at all.
-    if (result.markdown.trim().length === 0) {
-      return { body: noExtractionStub(source.mimeType) };
-    }
-    return { body: result.markdown, extractedBy: `context.dev:${result.type}` };
-  } catch (err) {
-    console.error("[extract] context.dev parse failed", {
-      sourceId: source.id,
-      mimeType: source.mimeType,
-      err,
-    });
-    return { body: noExtractionStub(source.mimeType) };
-  }
-}
-
-function extensionOf(filename: string | null): string | undefined {
-  const match = /\.([a-z0-9]+)$/i.exec(filename ?? "");
-  return match?.[1]?.toLowerCase();
 }
 
 /**
@@ -180,27 +136,12 @@ export async function processExtractJob(
 
     let body: string;
     let extractionModelId: string | undefined;
-    let extractedBy: string | undefined;
     if (
       source.kind === "file" &&
       source.mimeType &&
       TEXT_NATIVE_MIME.has(source.mimeType)
     ) {
       body = Buffer.from(bytes).toString("utf8");
-    } else if (
-      (source.kind === "file" || source.kind === "screenshot") &&
-      isParseableMime(source.mimeType) &&
-      parseConfigured()
-    ) {
-      // Documents, code/data files, and images go to Context.dev Parse — the
-      // path that turns a PDF or docx into real markdown instead of the
-      // metadata-only stub below. Screenshots come here too rather than to
-      // extractBinaryText; voice and video can't, since Parse handles neither.
-      // A parse failure is not a capture failure: the original is stored and
-      // the source still compiles, so we degrade to the stub.
-      const parsed = await parseDocument(source, bytes);
-      body = parsed.body;
-      extractedBy = parsed.extractedBy;
     } else if (
       source.kind === "screenshot" ||
       source.kind === "voice" ||
@@ -221,15 +162,13 @@ export async function processExtractJob(
           .values({ workspaceId, kind: "extract", cents, jobId: null });
       }
     } else {
-      // "file" with a mime neither text-native nor parseable (or with the
-      // Context.dev key unset): keep the capture (metadata only) rather than
-      // marking the source failed.
+      // A file with no Community extraction path remains a valid capture: keep
+      // its original plus metadata-only raw.md rather than failing the source.
       body = noExtractionStub(source.mimeType);
     }
 
     const provenance = {
       ...(extractionModelId ? { extractionModelId } : {}),
-      ...(extractedBy ? { extractedBy } : {}),
     };
     const metadata =
       Object.keys(provenance).length > 0

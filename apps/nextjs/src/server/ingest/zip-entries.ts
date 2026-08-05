@@ -160,7 +160,7 @@ export interface ExpandZipResult {
   childCount: number;
   /**
    * Extract jobs for the newly created children, for the caller to dispatch.
-   * Typed structurally (rather than importing @acme/cloud's ExtractJobData)
+   * Typed structurally (rather than importing @acme/runtime's ExtractJobData)
    * to keep this module free of runtime dependencies.
    */
   childJobs: { jobId: string; workspaceId: string; sourceId: string }[];

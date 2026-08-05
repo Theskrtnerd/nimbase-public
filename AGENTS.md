@@ -5,12 +5,11 @@ Capture → Compile → Share. This is a pnpm/Turborepo monorepo.
 
 ## Product priorities
 
-1. Backend and cloud systems: domain packages, API contracts, permissions,
+1. Backend and runtime systems: domain packages, API contracts, permissions,
    queues, capture/compile, reliability, observability, and tests.
 2. `apps/cli/`: the primary user interface and scriptable control plane.
 3. `apps/nextjs/`: authentication, REST/API, workers, MCP, and shares.
-4. `apps/artifact-renderer/`: optional PNG/PDF rendering for artifact delivery.
-5. `packages/connector-sdk/`: provider-neutral wire contracts for independent
+4. `packages/connector-sdk/`: provider-neutral wire contracts for independent
    out-of-process connectors.
 
 ## Core invariants

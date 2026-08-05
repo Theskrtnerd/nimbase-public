@@ -21,7 +21,9 @@ const mocks = vi.hoisted(() => ({
   streamText: vi.fn(() => ({
     toTextStreamResponse: () => new Response("answer"),
   })),
-  insertValues: vi.fn(() => Promise.resolve()),
+  agentTurn: { id: "agent-turn-id" },
+  insertValues: vi.fn(),
+  insertReturning: vi.fn(() => Promise.resolve([{ id: "turn-1" }])),
 }));
 
 vi.mock("~/server/agent/interfaces/widget/access", () => ({
@@ -50,11 +52,23 @@ vi.mock("ai", () => ({
   streamText: mocks.streamText,
   isStepCount: () => () => false,
 }));
-vi.mock("@acme/cloud", () => ({ costFor: () => 1 }));
+vi.mock("@acme/runtime/ai", () => ({ costFor: () => 1 }));
 vi.mock("@acme/db/client", () => ({
-  db: { insert: () => ({ values: mocks.insertValues }) },
+  db: {
+    insert: (table: unknown) => ({
+      values: (value: unknown) => {
+        mocks.insertValues(value);
+        return table === mocks.agentTurn
+          ? { returning: mocks.insertReturning }
+          : Promise.resolve();
+      },
+    }),
+  },
 }));
-vi.mock("@acme/db/schema", () => ({ AgentTurn: {}, SpendLedger: {} }));
+vi.mock("@acme/db/schema", () => ({
+  AgentTurn: mocks.agentTurn,
+  SpendLedger: {},
+}));
 
 const AGENT = {
   id: "a1",
@@ -168,6 +182,18 @@ describe("widget chat route", () => {
     expect(res.status).toBe(400);
   });
 
+  it("413s before parsing an oversized body", async () => {
+    const res = await POST(
+      request({
+        sessionId: "s1-very-long-session",
+        messages: [{ role: "user", content: "x".repeat(70_000) }],
+      }),
+      params,
+    );
+    expect(res.status).toBe(413);
+    expect(mocks.streamText).not.toHaveBeenCalled();
+  });
+
   it("streams on the happy path with the widget's instructions", async () => {
     const res = await POST(request(goodBody), params);
     expect(res.status).toBe(200);
@@ -179,5 +205,6 @@ describe("widget chat route", () => {
     expect(turnInput.workspaceId).toBe("ws1");
     expect(turnInput.instructions).toContain("Be helpful.");
     expect(mocks.streamText).toHaveBeenCalled();
+    expect(mocks.insertReturning).toHaveBeenCalled();
   });
 });

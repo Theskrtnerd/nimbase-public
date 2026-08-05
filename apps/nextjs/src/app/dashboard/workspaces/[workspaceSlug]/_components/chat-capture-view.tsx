@@ -15,12 +15,12 @@ import {
   VideoIcon,
   XIcon,
 } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 
 import { cn } from "@acme/ui";
 import { Button } from "@acme/ui/button";
 import { Textarea } from "@acme/ui/textarea";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { ingestFile, ingestText } from "~/lib/capture-client";
 
 interface CaptureItem {
@@ -52,7 +52,7 @@ export function ChatCaptureView({ workspaceId }: { workspaceId: string }) {
   const [items, setItems] = useState<CaptureItem[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
 
   function updateItem(id: string, patch: Partial<CaptureItem>) {
     setItems((prev) =>
@@ -62,7 +62,7 @@ export function ChatCaptureView({ workspaceId }: { workspaceId: string }) {
 
   function runTextCapture(value: string) {
     const id = newId();
-    posthog.capture("capture_submitted", {
+    analytics.capture("capture_submitted", {
       workspace_id: workspaceId,
       text_length: value.length,
     });
@@ -93,7 +93,7 @@ export function ChatCaptureView({ workspaceId }: { workspaceId: string }) {
 
   function runFileCapture(file: File) {
     const id = newId();
-    posthog.capture("file_captured", {
+    analytics.capture("file_captured", {
       workspace_id: workspaceId,
       file_type: file.type || "unknown",
       file_size_bytes: file.size,

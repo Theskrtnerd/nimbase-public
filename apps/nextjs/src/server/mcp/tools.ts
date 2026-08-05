@@ -4,11 +4,11 @@ import { z } from "zod/v4";
 
 import type { AccessContext } from "@acme/api/access";
 import { requireAccess } from "@acme/api/access";
-import { toProviderContext, toSearchHit } from "@acme/cloud";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { artifactVisibilitySchema, Workspace } from "@acme/db/schema";
+import { toProviderContext, toSearchHit } from "@acme/runtime/memory";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
 
 import type { ToolResult } from "./result";
 import { env } from "~/env";

@@ -2,16 +2,16 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
+import { and, desc, eq, isNotNull, isNull } from "@acme/db";
+import { db } from "@acme/db/client";
+import { WikiNode, WikiNodeTag } from "@acme/db/schema";
+import { scanReadableGraphInputs } from "@acme/runtime/graph-scan";
 import {
   ToolsetForbiddenError,
   toProviderContext,
   toSearchHit,
-} from "@acme/cloud";
-import { scanReadableGraphInputs } from "@acme/cloud/graph-scan";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
-import { and, desc, eq, isNotNull, isNull } from "@acme/db";
-import { db } from "@acme/db/client";
-import { WikiNode, WikiNodeTag } from "@acme/db/schema";
+} from "@acme/runtime/memory";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
 
 import { pathScopeWhere } from "../lib/access";
 import { buildKnowledgeGraph } from "../lib/knowledge-graph";
@@ -148,7 +148,7 @@ export const kbRouter = {
 
     // Readable compiled notes + their S3 bodies, scanned once (shared with the
     // MemoryProvider's neighbors op — MAX_GRAPH_NODES cap and body fan-out live
-    // in @acme/cloud/graph-scan).
+    // in @acme/runtime/graph-scan).
     const { inputs, truncated } = await scanReadableGraphInputs(
       input.workspaceId,
       access.scopes("viewer"),

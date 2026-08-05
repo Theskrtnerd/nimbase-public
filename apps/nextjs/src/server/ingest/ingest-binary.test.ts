@@ -41,13 +41,11 @@ vi.mock("@acme/db/client", () => ({
     })),
   },
 }));
-vi.mock("@acme/cloud", () => ({
-  s3: {
-    s3KeyFor: { originalSource: mocks.originalSource },
-    presignPutUrl: mocks.presignPutUrl,
-    headObject: mocks.headObject,
-    putObject: mocks.putObject,
-  },
+vi.mock("@acme/runtime/s3", () => ({
+  s3KeyFor: { originalSource: mocks.originalSource },
+  presignPutUrl: mocks.presignPutUrl,
+  headObject: mocks.headObject,
+  putObject: mocks.putObject,
 }));
 vi.mock("./extract-dispatch", () => ({
   dispatchExtract: mocks.dispatchExtract,

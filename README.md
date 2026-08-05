@@ -121,13 +121,12 @@ Turborepo + pnpm monorepo.
 ```
 apps/
 ├─ cli/               nimbase CLI — the primary control plane (commander + tsup)
-├─ nextjs/            REST + tRPC API, workers, MCP transport, auth, shares
-└─ artifact-renderer/ headless-Chromium service: artifacts → PNG/PDF for chat agents
+└─ nextjs/            REST + tRPC API, workers, MCP transport, auth, shares
 
 packages/
 ├─ connector-sdk/ Apache-licensed contracts and connector handler
 ├─ api/           tRPC router + core business services
-├─ cloud/         memory kernel, OKF codec, gardener, capture/compile, search, S3, queue
+├─ runtime/       memory, harness/VFS, capture/compile, search, S3, queue
 ├─ db/            Drizzle schema, migrations, path-scope SQL helpers
 ├─ agents/        agent definitions — gardener, chat, biographer, artifact
 ├─ validators/    shared Zod wire schemas, including the CLI contract

@@ -2,10 +2,10 @@ import "server-only";
 
 import type { PathScope } from "@acme/db";
 import type { ArtifactVisibility } from "@acme/db/schema";
-import { s3 } from "@acme/cloud";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Artifact } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import type { ArtifactOutput } from "./output-mode";
 import type { AttachmentSink } from "~/server/agent/attachments";
@@ -16,7 +16,6 @@ import {
   decideArtifactAttachment,
   explainRefusal,
 } from "./output-mode";
-import { renderArtifactArtifact, rendererAvailable } from "./render-client";
 
 // `/s/<slug>` serves a "still building" placeholder while a artifact generates
 // (app/s/[slug]/route.ts), so the link is never dead and authoring does not
@@ -102,6 +101,15 @@ export interface ArtifactAuthoringConfig {
    * which makes `link` the only reachable output there.
    */
   attachments?: AttachmentSink;
+  /** Optional hosted adapter for PNG/PDF output. Community ships no renderer. */
+  renderer?: ArtifactFileRenderer;
+}
+
+export interface ArtifactFileRenderer {
+  render(
+    html: string,
+    format: Exclude<ArtifactOutput, "link" | "html">,
+  ): Promise<Buffer>;
 }
 
 /**
@@ -118,13 +126,14 @@ async function attachArtifactFile(
   output: ArtifactOutput,
   visibility: ArtifactVisibility,
   sink: AttachmentSink | undefined,
+  renderer: ArtifactFileRenderer | undefined,
 ): Promise<string | null> {
   if (!sink) return null;
 
   const decision = decideArtifactAttachment({
     output,
     visibility,
-    rendererAvailable: rendererAvailable(),
+    rendererAvailable: Boolean(renderer),
   });
   if (!decision.attach) return explainRefusal(decision.refusal);
 
@@ -142,7 +151,10 @@ async function attachArtifactFile(
     const data =
       decision.format === "html"
         ? Buffer.from(html, "utf8")
-        : await renderArtifactArtifact(html, decision.format);
+        : renderer
+          ? await renderer.render(html, decision.format)
+          : null;
+    if (!data) return "The file could not be rendered. Share the link instead.";
     sink.add({
       data,
       filename: attachmentFilename(title, decision.format),
@@ -188,7 +200,7 @@ export async function authorArtifact(
     decideArtifactAttachment({
       output,
       visibility: config.visibility,
-      rendererAvailable: rendererAvailable(),
+      rendererAvailable: Boolean(config.renderer),
     }).attach;
 
   const outcome = await waitForArtifact(created.id, {
@@ -219,6 +231,7 @@ export async function authorArtifact(
     output,
     config.visibility,
     config.attachments,
+    config.renderer,
   );
 
   return [

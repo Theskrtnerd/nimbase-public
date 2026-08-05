@@ -2,8 +2,8 @@ import "server-only";
 
 import type { AccessContext } from "@acme/api/access";
 import { loadNodeSources } from "@acme/api/node-metadata";
-import { ToolsetForbiddenError, toProviderContext } from "@acme/cloud";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
+import { ToolsetForbiddenError, toProviderContext } from "@acme/runtime/memory";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
 
 // Full markdown body for one compiled note, gated on the caller's read
 // scopes. Mirrors kb.getNode; shared by the REST route (CLI) and the MCP

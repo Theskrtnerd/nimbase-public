@@ -1,9 +1,11 @@
 import { zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as AcmeCloud from "@acme/cloud";
-import type { ExtractJobData as ExtractJob } from "@acme/cloud";
-import type * as HarnessModule from "@acme/cloud/harness";
+import type * as RuntimeAi from "@acme/runtime/ai";
+import type * as HarnessModule from "@acme/runtime/harness";
+import type * as RuntimeNormalize from "@acme/runtime/normalize";
+import type { ExtractJobData as ExtractJob } from "@acme/runtime/queue";
+import type * as RuntimeS3 from "@acme/runtime/s3";
 
 // End-to-end capture pipeline test: calls the REAL ingestSource /
 // presignBinarySource / finalizeBinarySource / processExtractJob /
@@ -63,9 +65,6 @@ const mocks = vi.hoisted(() => {
     resolveModels: vi.fn(),
     costFor: vi.fn(),
     extractBinaryText: vi.fn(),
-    parseBytes: vi.fn(),
-    isParseableMime: vi.fn(() => false),
-    parseConfigured: vi.fn(() => false),
     runGardenerHarness: vi.fn(),
   };
 });
@@ -166,38 +165,44 @@ vi.mock("@acme/db/client", () => ({
   },
 }));
 
-// Real s3KeyFor and buildRawMd (pure, no side effects); only the I/O methods
-// are faked, backed by the shared in-memory s3Store.
-vi.mock("@acme/cloud", async (importOriginal) => {
-  const actual = await importOriginal<typeof AcmeCloud>();
+// Real s3KeyFor is pure; only the I/O methods are faked, backed by the shared
+// in-memory s3Store.
+vi.mock("@acme/runtime/s3", async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeS3>();
   return {
     ...actual,
-    s3: {
-      ...actual.s3,
-      putObject: (key: string, body: string) => {
-        mocks.s3Store.set(key, body);
-        return Promise.resolve();
-      },
-      getObjectText: (key: string) =>
-        Promise.resolve(String(mocks.s3Store.get(key) ?? "")),
-      getObjectBytes: (key: string) => {
-        const value = mocks.s3Store.get(key);
-        return Promise.resolve(
-          value instanceof Uint8Array
-            ? value
-            : new TextEncoder().encode(String(value ?? "")),
-        );
-      },
-      presignPutUrl: (key: string) =>
-        Promise.resolve(`https://fake-s3.test/${key}`),
-      headObject: (key: string) => Promise.resolve(mocks.s3Store.has(key)),
+    putObject: (key: string, body: string) => {
+      mocks.s3Store.set(key, body);
+      return Promise.resolve();
     },
+    getObjectText: (key: string) =>
+      Promise.resolve(String(mocks.s3Store.get(key) ?? "")),
+    getObjectBytes: (key: string) => {
+      const value = mocks.s3Store.get(key);
+      return Promise.resolve(
+        value instanceof Uint8Array
+          ? value
+          : new TextEncoder().encode(String(value ?? "")),
+      );
+    },
+    presignPutUrl: (key: string) =>
+      Promise.resolve(`https://fake-s3.test/${key}`),
+    headObject: (key: string) => Promise.resolve(mocks.s3Store.has(key)),
+  };
+});
+vi.mock("@acme/runtime/ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeAi>();
+  return {
+    ...actual,
     resolveModels: mocks.resolveModels,
     costFor: mocks.costFor,
+  };
+});
+vi.mock("@acme/runtime/normalize", async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeNormalize>();
+  return {
+    ...actual,
     extractBinaryText: mocks.extractBinaryText,
-    parseBytes: mocks.parseBytes,
-    isParseableMime: mocks.isParseableMime,
-    parseConfigured: mocks.parseConfigured,
   };
 });
 vi.mock("@acme/api/entitlements", () => ({
@@ -207,7 +212,7 @@ vi.mock("@acme/api/entitlements", () => ({
 vi.mock("@clerk/nextjs/server", () => ({
   clerkClient: () => Promise.resolve({ users: { getUser: mocks.getUser } }),
 }));
-vi.mock("@acme/cloud/harness", async (importOriginal) => {
+vi.mock("@acme/runtime/harness", async (importOriginal) => {
   const actual = await importOriginal<typeof HarnessModule>();
   return { ...actual, runGardenerHarness: mocks.runGardenerHarness };
 });

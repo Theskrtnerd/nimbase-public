@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { BrainInitJobData } from "@acme/cloud";
-import { publishBrainInit } from "@acme/cloud";
+import type { BrainInitJobData } from "@acme/runtime/queue";
+import { publishBrainInit } from "@acme/runtime/queue";
 
 import { env } from "~/env";
 import { runBrainInitJob } from "./init";

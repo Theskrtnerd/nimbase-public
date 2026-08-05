@@ -1,4 +1,4 @@
-import { compileJobSchema } from "@acme/cloud/queue";
+import { compileJobSchema } from "@acme/runtime/queue";
 
 import { runCompileJob } from "~/server/compile/dispatch";
 import { verifyQstashSignature } from "~/server/qstash";

@@ -1,12 +1,12 @@
 import { registerOTel } from "@vercel/otel";
 
-import { langfuseBaseUrl } from "@acme/cloud";
+import { langfuseBaseUrl } from "@acme/runtime/ai";
 
 import { env } from "~/env";
 
 // Next.js instrumentation hook. Registers Langfuse's OpenTelemetry span
 // processor so the "generation" observations created by `traceGeneration`
-// (packages/cloud/src/ai/telemetry.ts) are exported to Langfuse. Dark by
+// (packages/runtime/src/ai/telemetry.ts) are exported to Langfuse. Dark by
 // default: with no Langfuse keys set this returns without registering anything,
 // so the app runs identically to today.
 //

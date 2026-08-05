@@ -9,10 +9,11 @@ import type {
   SourceStatus,
 } from "@acme/db/schema";
 import { persistSourceProviderAccessPolicy } from "@acme/api/provider-access";
-import { buildRawMd, s3 } from "@acme/cloud";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { CompileJob, Source } from "@acme/db/schema";
+import { buildRawMd } from "@acme/runtime/raw-md";
+import * as s3 from "@acme/runtime/s3";
 
 import { dispatchCompile } from "~/server/compile/dispatch";
 import { findDuplicateSourceId, reserveCapture } from "./reserve-capture";

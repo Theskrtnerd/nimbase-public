@@ -12,11 +12,11 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 
 import { cn } from "@acme/ui";
 import { Button } from "@acme/ui/button";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { useTRPC } from "~/trpc/react";
 import { RawSource } from "./raw-source";
 
@@ -50,7 +50,7 @@ interface ArtifactListItem {
 export function ArtifactView({ workspaceId }: { workspaceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -101,7 +101,7 @@ export function ArtifactView({ workspaceId }: { workspaceId: string }) {
   const setVisibilityMutation = useMutation(
     trpc.artifact.setVisibility.mutationOptions({
       onSuccess: (_, variables) => {
-        posthog.capture("artifact_visibility_changed", {
+        analytics.capture("artifact_visibility_changed", {
           visibility: variables.visibility,
         });
         void refreshList();
@@ -219,7 +219,7 @@ function GenerateArtifactForm({
   targets: { folderId: string | null; label: string }[];
   onCreated: (id: string) => Promise<void> | void;
 }) {
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [prompt, setPrompt] = useState("");
   const [kind, setKind] = useState<Kind>("fixed");
   const [themeMode, setThemeMode] = useState<ThemeMode>("app");
@@ -258,7 +258,7 @@ function GenerateArtifactForm({
         return;
       }
       const { id } = (await res.json()) as { id: string };
-      posthog.capture("artifact_generated", {
+      analytics.capture("artifact_generated", {
         kind,
         theme_mode: themeMode,
       });
@@ -488,7 +488,7 @@ function ArtifactDetail({
   onRegenerate: () => void;
   busy: boolean;
 }) {
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [copied, setCopied] = useState(false);
   // Fixed artifactes can flip between the rendered preview and their TSX source.
   // Keyed remount (parent passes key={artifact.id}) resets this on artifact switch.
@@ -511,7 +511,7 @@ function ArtifactDetail({
     if (!artifact.slug) return;
     const url = `${window.location.origin}/s/${artifact.slug}`;
     void navigator.clipboard.writeText(url).then(() => {
-      posthog.capture("artifact_link_copied", {
+      analytics.capture("artifact_link_copied", {
         visibility: artifact.visibility,
       });
       setCopied(true);

@@ -3,7 +3,6 @@
 import { useReducer, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon, Loader2Icon } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 
 import type { RouterOutputs } from "@acme/api";
 import type {
@@ -25,6 +24,7 @@ import {
 import { Switch } from "@acme/ui/switch";
 import { Textarea } from "@acme/ui/textarea";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { env } from "~/env";
 import { useTRPC } from "~/trpc/react";
 
@@ -151,7 +151,7 @@ export function CreateGroupMcpPanel({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [form, dispatch] = useReducer(
     groupMcpFormReducer,
     INITIAL_GROUP_MCP_FORM_STATE,
@@ -168,7 +168,7 @@ export function CreateGroupMcpPanel({
   const create = useMutation(
     trpc.groupMcp.create.mutationOptions({
       onSuccess: async (res) => {
-        posthog.capture("group_mcp_created", { workspaceId });
+        analytics.capture("group_mcp_created", { workspaceId });
         await queryClient.invalidateQueries(
           trpc.groupMcp.list.queryFilter({ workspaceId }),
         );
@@ -387,7 +387,7 @@ export function GroupMcpRowCard({
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [freshToken, setFreshToken] = useState<string | null>(null);
   const url = endpointUrl(orgSlug ?? "workspace", row.slug);
@@ -400,7 +400,7 @@ export function GroupMcpRowCard({
   const setEnabled = useMutation(
     trpc.groupMcp.setEnabled.mutationOptions({
       onSuccess: (_data, variables) => {
-        posthog.capture("group_mcp_enabled_changed", {
+        analytics.capture("group_mcp_enabled_changed", {
           workspaceId,
           enabled: variables.enabled,
         });
@@ -411,7 +411,7 @@ export function GroupMcpRowCard({
   const rotateKey = useMutation(
     trpc.groupMcp.rotateKey.mutationOptions({
       onSuccess: (res) => {
-        posthog.capture("group_mcp_key_rotated", { workspaceId });
+        analytics.capture("group_mcp_key_rotated", { workspaceId });
         setFreshToken(res.token);
       },
     }),
@@ -424,7 +424,7 @@ export function GroupMcpRowCard({
   const del = useMutation(
     trpc.groupMcp.delete.mutationOptions({
       onSuccess: () => {
-        posthog.capture("group_mcp_deleted", { workspaceId });
+        analytics.capture("group_mcp_deleted", { workspaceId });
         void invalidateList();
       },
     }),

@@ -1,9 +1,9 @@
+import { buildArtifactHtml } from "@acme/runtime/artifact-build";
 import {
   ARTIFACT_MERMAID_HEAD,
-  ARTIFACT_THEME_HEAD,
-  buildArtifactHtml,
   usesMermaid,
-} from "@acme/cloud";
+} from "@acme/runtime/artifact-mermaid";
+import { ARTIFACT_THEME_HEAD } from "@acme/runtime/artifact-theme";
 
 import { hasUnsafeScript } from "~/server/share/sanitize";
 
@@ -94,7 +94,7 @@ export function artifactRepairPrompt(opts: {
   const artifact = opts.kind === "fixed" ? "TSX component" : "HTML document";
   const cause =
     opts.error.code === "unsafe_output"
-      ? `The document contains a <script> tag, which is not allowed. Remove every <script> tag except the Tailwind CDN one, and drop any behaviour that depended on it — render the result statically instead.`
+      ? `The document contains a blocked <script> tag. Keep only the exact local Tailwind runtime tag from the output rules, and drop any behaviour that depended on other scripts — render the result statically instead.`
       : `The ${artifact} failed to parse:\n\n${opts.error.detail}\n\nThe location is reported as (line:column) into the source below.`;
   const truncationNote = opts.truncated
     ? `\n\nYour previous output was cut off at the output-token limit — the file is incomplete, which is the likely cause. Produce a SHORTER artifact that fits: fewer inline data rows, fewer sections, no repeated boilerplate. Completeness matters more than richness.`
@@ -120,12 +120,13 @@ function injectMermaid(html: string): string {
 }
 
 // Splice the app design tokens into freeform HTML. Prefer placing it right
-// after the Tailwind CDN <script> so `tailwind.config` is read once the Play
-// CDN has loaded; otherwise fall back to just before </head>.
+// after the Tailwind runtime <script> so `tailwind.config` is read once the Play
+// runtime has loaded; otherwise fall back to just before </head>.
 function injectAppTheme(html: string): string {
-  const cdnTag = /<script[^>]*cdn\.tailwindcss\.com[^>]*>\s*<\/script>/i;
-  if (cdnTag.test(html)) {
-    return html.replace(cdnTag, (tag) => `${tag}\n${ARTIFACT_THEME_HEAD}`);
+  const runtimeTag =
+    /<script[^>]*nimbase-artifact-runtime\.invalid\/api\/artifact-runtime\/tailwind[^>]*>\s*<\/script>/i;
+  if (runtimeTag.test(html)) {
+    return html.replace(runtimeTag, (tag) => `${tag}\n${ARTIFACT_THEME_HEAD}`);
   }
   if (/<\/head>/i.test(html)) {
     return html.replace(/<\/head>/i, `${ARTIFACT_THEME_HEAD}\n</head>`);

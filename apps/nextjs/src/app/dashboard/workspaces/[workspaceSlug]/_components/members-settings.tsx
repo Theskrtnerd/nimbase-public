@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { XIcon } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
 
 import { cn } from "@acme/ui";
 import { Badge } from "@acme/ui/badge";
 import { Button } from "@acme/ui/button";
 import { Input } from "@acme/ui/input";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { useTRPC } from "~/trpc/react";
 
 export function MembersSettings({ workspaceId }: { workspaceId: string }) {
@@ -124,7 +124,7 @@ function MembersSection({
   onMutated: () => void;
 }) {
   const trpc = useTRPC();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"member" | "admin">("member");
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -145,7 +145,7 @@ function MembersSection({
   const inviteMutation = useMutation(
     trpc.members.invite.mutationOptions({
       onSuccess: (result, variables) => {
-        posthog.capture("member_invited", {
+        analytics.capture("member_invited", {
           role: variables.role,
           email_sent: result.emailSent,
           workspace_id: workspaceId,

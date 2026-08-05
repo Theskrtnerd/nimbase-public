@@ -85,7 +85,7 @@ export const brainInitStatusSchema = z.enum(["pending", "done", "failed"]);
 export type BrainInitStatus = z.infer<typeof brainInitStatusSchema>;
 
 // --- source.metadata: structured capture metadata, mirrored into raw.md's
-// frontmatter by buildRawMd (@acme/cloud). Union of what's known across
+// frontmatter by buildRawMd (@acme/runtime). Union of what's known across
 // kinds; every field optional since it varies by kind. passthrough() so a
 // future kind-specific field doesn't get silently dropped at the edge.
 export const sourceMetadataSchema = z
@@ -108,7 +108,7 @@ export const sourceMetadataSchema = z
     // extraction provenance (screenshot/voice/non-text file)
     extractionModelId: z.string().optional(),
     // extraction provenance for the non-AI path: which service produced the
-    // body and what format it decided the bytes were, e.g. "context.dev:pdf".
+    // body and what format it decided the bytes were, e.g. "parser:pdf".
     extractedBy: z.string().optional(),
     // archive provenance, set on a child born from a .zip expansion: the
     // container Source it came from and its path inside the archive. The
@@ -521,7 +521,7 @@ export const WikiNode = pgTable(
     restricted: t.boolean().notNull().default(false),
     // Derived display title, recomputed from the current version's
     // frontmatter on every write (see compile/title.ts). Required — new
-    // notes must declare a title at creation (@acme/cloud/memory/wiki vfs.ts write()); there
+    // notes must declare a title at creation (@acme/runtime/memory/wiki vfs.ts write()); there
     // is no path-derived fallback anywhere in the running app. Folder rows
     // (kind: "folder") get a throwaway value at insert since nothing ever
     // displays it — the column is NOT NULL table-wide.

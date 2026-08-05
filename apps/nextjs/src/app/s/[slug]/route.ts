@@ -1,10 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 
 import { resolveAccess } from "@acme/api/access";
-import { s3 } from "@acme/cloud";
 import { and, eq, isNull } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Artifact, WikiNode } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import { decideShareAccess } from "~/server/share/access-decision";
 import { buildingPage } from "~/server/share/building-page";
@@ -47,7 +47,7 @@ async function isArtifactReader(
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
@@ -97,9 +97,12 @@ export async function GET(
       });
     }
     return serveShareHtml(await s3.getObjectText(artifact.s3KeyHtml), {
-      title: artifact.title,
-      description: artifact.prompt,
-      url: shareUrl(slug),
+      runtimeOrigin: new URL(req.url).origin,
+      meta: {
+        title: artifact.title,
+        description: artifact.prompt,
+        url: shareUrl(slug),
+      },
     });
   }
 

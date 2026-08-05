@@ -20,6 +20,7 @@ export default defineConfig({
       // @t3-oss/env-nextjs, which throws when they're unset. Unit tests for
       // pure functions (e.g. groupMcpRewritePath) don't need real env vars.
       "~/env": new URL("./src/test/env-stub.ts", import.meta.url).pathname,
+      "~": new URL("./src", import.meta.url).pathname,
     },
   },
 });

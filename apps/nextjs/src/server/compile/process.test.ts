@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GardenerError } from "@acme/cloud/memory/wiki";
+import { GardenerError } from "@acme/runtime/memory/wiki";
 
 import { processCompileJob } from "./process";
 
@@ -44,17 +44,13 @@ vi.mock("@acme/db/client", () => ({
     })),
   },
 }));
-vi.mock("@acme/cloud", () => {
+vi.mock("@acme/runtime/ai", () => {
   // Mirror the registry pricing so cost assertions stay meaningful; the exact
-  // pricing math is covered by packages/cloud/src/ai/cost.test.ts.
+  // pricing math is covered by packages/runtime/src/ai/cost.test.ts.
   const PRICING: Record<string, { input: number; output: number }> = {
     "anthropic/claude-sonnet-4.6": { input: 300, output: 1500 },
   };
   return {
-    s3: { getObjectText: mocks.getObjectText },
-    // The compile worker builds a system provider context; reconcile is mocked
-    // (below) and ignores it, so a bare stub is enough.
-    toProviderContext: () => ({}),
     resolveModels: () =>
       Promise.resolve({
         chat: {
@@ -70,10 +66,18 @@ vi.mock("@acme/cloud", () => {
     },
   };
 });
+vi.mock("@acme/runtime/s3", () => ({
+  getObjectText: mocks.getObjectText,
+}));
+vi.mock("@acme/runtime/memory", () => ({
+  // The compile worker builds a system provider context; reconcile is mocked
+  // (below) and ignores it, so a bare stub is enough.
+  toProviderContext: () => ({}),
+}));
 // Only GardenerError is needed from the wiki internals; stub it (rather than
 // loading the real gardener/VFS graph) so `err instanceof GardenerError` in the
 // failure path resolves to the same class the test throws.
-vi.mock("@acme/cloud/memory/wiki", () => ({
+vi.mock("@acme/runtime/memory/wiki", () => ({
   GardenerError: class GardenerError extends Error {
     partialReport: string;
     constructor(message: string, partialReport: string) {
@@ -84,7 +88,7 @@ vi.mock("@acme/cloud/memory/wiki", () => ({
 }));
 // The memory backend: processCompileJob drives writes through the shared
 // memoryProvider singleton's reconcile.
-vi.mock("@acme/cloud/memory/wiki-pg-provider", () => ({
+vi.mock("@acme/runtime/memory/wiki-pg-provider", () => ({
   memoryProvider: { reconcile: mocks.reconcile },
 }));
 

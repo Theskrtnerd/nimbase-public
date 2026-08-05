@@ -2,7 +2,6 @@ import type { TRPCRouterRecord } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod/v4";
 
-import { headObject, presignGetUrl, presignPutUrl } from "@acme/cloud/s3";
 import { and, count, desc, eq, getTableColumns } from "@acme/db";
 import { db } from "@acme/db/client";
 import {
@@ -11,6 +10,7 @@ import {
   Workspace,
   WorkspaceMember,
 } from "@acme/db/schema";
+import { headObject, presignGetUrl, presignPutUrl } from "@acme/runtime/s3";
 
 import { assertAdmin, requireAccess } from "../lib/access";
 import { createWorkspace } from "../lib/workspace-control";

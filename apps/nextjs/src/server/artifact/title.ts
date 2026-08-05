@@ -3,9 +3,9 @@ import "server-only";
 import { generateObject } from "ai";
 import { z } from "zod/v4";
 
-import { costFor, resolveModels } from "@acme/cloud";
 import { db } from "@acme/db/client";
 import { SpendLedger } from "@acme/db/schema";
+import { costFor, resolveModels } from "@acme/runtime/ai";
 
 const MAX_TITLE_CHARS = 80;
 const MAX_PROMPT_CHARS = 2000;

@@ -13,22 +13,20 @@ const mocks = vi.hoisted(() => ({
     }),
   ),
   upsert: vi.fn(() => Promise.resolve({ id: "node-1" })),
-  putObject: vi.fn(() => Promise.resolve()),
   ingestSource: vi.fn(() => Promise.resolve({ sourceId: "src-1" })),
   workspaceRow: vi.fn(),
   update: vi.fn((_values: Record<string, unknown>): undefined => undefined),
 }));
 
-vi.mock("@acme/cloud/biographer", () => ({
+vi.mock("@acme/runtime/biographer", () => ({
   COMPANY_MD_PATH: "company.md",
   draftCompanyMd: mocks.draftCompanyMd,
   enrichCompanyWebsite: mocks.enrichCompanyWebsite,
 }));
-vi.mock("@acme/cloud/s3", () => ({ putObject: mocks.putObject }));
-vi.mock("@acme/cloud/memory/wiki-pg-provider", () => ({
+vi.mock("@acme/runtime/memory/wiki-pg-provider", () => ({
   memoryProvider: { upsert: mocks.upsert },
 }));
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/memory", () => ({
   toProviderContext: (x: unknown) => x,
 }));
 vi.mock("@acme/api/access", () => ({
@@ -187,39 +185,6 @@ describe("runBrainInitJob", () => {
     );
     expect(mocks.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ description: "Acme builds anvils." }),
-    );
-  });
-
-  it("caches the enriched company logo in workspace storage", async () => {
-    mocks.enrichCompanyWebsite.mockResolvedValueOnce({
-      title: "Acme Corporation",
-      description: "Acme builds anvils.",
-      logoUrl: "https://media.context.dev/acme.svg",
-      siteText: "Acme builds anvils.",
-    });
-    const logoBytes = new Uint8Array([60, 115, 118, 103, 62]);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(logoBytes, {
-            headers: { "content-type": "image/svg+xml" },
-          }),
-        ),
-      ),
-    );
-
-    await runBrainInitJob({
-      jobId: "j1",
-      workspaceId: "ws-1",
-      websiteUrl: "https://acme.test",
-      identitySource: "manual",
-    });
-
-    expect(mocks.putObject).toHaveBeenCalledWith(
-      "workspaces/ws-1/branding/logo",
-      logoBytes,
-      "image/svg+xml",
     );
   });
 

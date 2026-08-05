@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 
 import {
   Command,
@@ -19,6 +18,7 @@ import {
   DialogTitle,
 } from "@acme/ui/dialog";
 
+import { useAnalytics } from "~/app/_components/analytics";
 import { useTRPC } from "~/trpc/react";
 
 const DEBOUNCE_MS = 200;
@@ -38,7 +38,7 @@ export function WorkspaceSearch({
   onOpenNote: (nodeId: string) => void;
 }) {
   const trpc = useTRPC();
-  const posthog = usePostHog();
+  const analytics = useAnalytics();
   const [value, setValue] = useState("");
   const [debounced, setDebounced] = useState("");
   // Debounce via a ref'd timeout rather than an effect (CLAUDE.md: avoid
@@ -79,7 +79,7 @@ export function WorkspaceSearch({
     timer.current = setTimeout(() => {
       setDebounced(next);
       if (next.trim().length > 0) {
-        posthog.capture("memory_searched", {
+        analytics.capture("memory_searched", {
           query_length: next.trim().length,
           workspace_id: workspaceId,
         });
@@ -97,7 +97,7 @@ export function WorkspaceSearch({
   }
 
   function select(nodeId: string) {
-    posthog.capture("search_result_selected", {
+    analytics.capture("search_result_selected", {
       workspace_id: workspaceId,
     });
     if (timer.current) clearTimeout(timer.current);

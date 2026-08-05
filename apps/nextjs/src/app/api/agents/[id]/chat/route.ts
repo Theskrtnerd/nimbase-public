@@ -5,19 +5,25 @@ import { convertToModelMessages, isStepCount, streamText } from "ai";
 
 import { requireAccess, resolveAgentScopes } from "@acme/api/access";
 import { intersectScopes } from "@acme/api/access-core";
-import { costFor } from "@acme/cloud";
 import { eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Agent, AgentTurn, SpendLedger } from "@acme/db/schema";
+import { costFor } from "@acme/runtime/ai";
 
 import { getAuthSession } from "~/auth/server";
 import { agentAnchorPath } from "~/server/agent/anchor";
+import {
+  checkAgentChatGate,
+  parseAgentChatMessages,
+  recordAgentTurnError,
+} from "~/server/agent/chat-gates";
 import {
   AGENT_MAX_STEPS,
   AGENT_MAX_TOTAL_TOKENS,
   assembleKbTurn,
 } from "~/server/agent/turn";
 import { invalidIdTextResponse, isUuidParam } from "~/server/http/params";
+import { RequestBodyError } from "~/server/http/request-body";
 
 export const maxDuration = 60;
 
@@ -64,7 +70,17 @@ export async function POST(
     access.scopes("viewer"),
   );
 
-  const { messages } = (await req.json()) as { messages: UIMessage[] };
+  let messages: UIMessage[];
+  try {
+    messages = await parseAgentChatMessages(req);
+  } catch (error) {
+    const status = error instanceof RequestBodyError ? error.status : 400;
+    return Response.json({ error: "invalid_request" }, { status });
+  }
+  const gate = await checkAgentChatGate(agent.workspaceId);
+  if (!gate.ok) {
+    return Response.json({ error: gate.error }, { status: gate.status });
+  }
   const assembled = await assembleKbTurn({
     workspaceId: agent.workspaceId,
     scopes,
@@ -72,6 +88,15 @@ export async function POST(
   });
   const question = lastUserText(messages);
   const modelMessages = await convertToModelMessages(messages);
+  const [turn] = await db
+    .insert(AgentTurn)
+    .values({
+      agentId: agent.id,
+      workspaceId: agent.workspaceId,
+      question,
+    })
+    .returning({ id: AgentTurn.id });
+  if (!turn) return new Response("Could not reserve turn", { status: 500 });
 
   const result = streamText({
     model: assembled.model,
@@ -90,19 +115,29 @@ export async function POST(
         inputTokens: totalUsage.inputTokens ?? 0,
         outputTokens: totalUsage.outputTokens ?? 0,
       });
-      await db.insert(AgentTurn).values({
-        agentId: agent.id,
-        workspaceId: agent.workspaceId,
-        question,
-        answer: text,
-        tokens: totalUsage.totalTokens ?? 0,
-        costCents: cents,
-      });
-      await db.insert(SpendLedger).values({
-        workspaceId: agent.workspaceId,
-        kind: "agent",
-        cents,
-      });
+      const writes: PromiseLike<unknown>[] = [
+        db
+          .update(AgentTurn)
+          .set({
+            answer: text,
+            tokens: totalUsage.totalTokens ?? 0,
+            costCents: cents,
+          })
+          .where(eq(AgentTurn.id, turn.id)),
+      ];
+      if (cents > 0) {
+        writes.push(
+          db.insert(SpendLedger).values({
+            workspaceId: agent.workspaceId,
+            kind: "agent",
+            cents,
+          }),
+        );
+      }
+      await Promise.all(writes);
+    },
+    onError: ({ error }) => {
+      void recordAgentTurnError(turn.id, error);
     },
   });
 

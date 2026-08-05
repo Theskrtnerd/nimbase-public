@@ -4,8 +4,8 @@ import { z } from "zod/v4";
 
 import type { AccessContext } from "@acme/api/access";
 import type { ArtifactVisibility, GroupMcpTool } from "@acme/db/schema";
-import { toProviderContext, toSearchHit } from "@acme/cloud";
-import { memoryProvider } from "@acme/cloud/memory/wiki-pg-provider";
+import { toProviderContext, toSearchHit } from "@acme/runtime/memory";
+import { memoryProvider } from "@acme/runtime/memory/wiki-pg-provider";
 
 import {
   authorArtifact,

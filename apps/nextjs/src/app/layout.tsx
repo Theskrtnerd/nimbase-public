@@ -8,7 +8,6 @@ import { Toaster } from "@acme/ui/toast";
 
 import { GlobalThemeToggle } from "~/app/_components/global-theme-toggle";
 import { MotionProvider } from "~/app/_components/motion-provider";
-import { PostHogProvider } from "~/app/_components/posthog-provider";
 import { env } from "~/env";
 import { TRPCReactProvider } from "~/trpc/react";
 
@@ -69,15 +68,13 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         )}
       >
         <ClerkProvider>
-          <PostHogProvider>
-            <ThemeProvider defaultTheme="light">
-              <MotionProvider>
-                <TRPCReactProvider>{props.children}</TRPCReactProvider>
-                <GlobalThemeToggle />
-                <Toaster />
-              </MotionProvider>
-            </ThemeProvider>
-          </PostHogProvider>
+          <ThemeProvider defaultTheme="light">
+            <MotionProvider>
+              <TRPCReactProvider>{props.children}</TRPCReactProvider>
+              <GlobalThemeToggle />
+              <Toaster />
+            </MotionProvider>
+          </ThemeProvider>
         </ClerkProvider>
       </body>
     </html>

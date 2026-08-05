@@ -8,46 +8,31 @@ name: Eval
 # pre-commit.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# PHASE 1 (report-only) — started 2026-07-05.
-#   REPORT_ONLY: "true" below means a metric drop is SURFACED (PR comment + job
-#   summary, flagged as "would fail") but NEVER fails the check. The goal of the
-#   first ~2–3 weeks is to observe the natural run-to-run variance of the metrics
-#   (esp. on main pushes, which accumulate baseline data even without a PR).
-#
-# PHASE 2 (blocking) — FLIP CRITERIA, revisit on/after ~2026-07-26:
-#   Flip to blocking once BOTH hold, using the accumulated main + PR runs:
-#     1. ≥ ~2–3 weeks elapsed AND a reasonable number of runs recorded
-#        (target ≳ 15 runs across PRs + main pushes), and
-#     2. observed run-to-run variance of recall@5 and MRR stays within the
-#        tolerance the eval already applies (EPSILON = 0.02 in
-#        packages/cloud/src/memory/evals/retrieval.eval.ts). If real variance is
-#        larger, widen EPSILON there FIRST (committed diff), then flip.
-#   To flip: set `REPORT_ONLY: "false"` below. That alone makes a real
-#   below-baseline drop fail the check (the run step already captures the eval
-#   exit code; report-only only suppresses the final non-zero exit). No other
-#   edit is required.
+# The observation period that began 2026-07-05 has completed. The gate is now
+# blocking: metric regressions, eval crashes, and scope-leak assertions all fail
+# the check. Baseline changes remain explicit committed diffs.
 #
 #   Baseline updates stay explicit, reviewer-visible committed diffs: regenerate
-#   with `pnpm --filter @acme/cloud eval:baseline` and commit the baseline.json
+#   with `pnpm --filter @acme/runtime eval:baseline` and commit the baseline.json
 #   change in the same PR — this workflow never rewrites the baseline.
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
   pull_request:
     paths:
-      - "packages/cloud/src/memory/**"
-      - "packages/cloud/src/search.ts"
+      - "packages/runtime/src/memory/**"
+      - "packages/runtime/src/search.ts"
       - "packages/db/src/schema.ts"
       # Re-run if the eval harness/baseline or this workflow itself changes.
-      - "packages/cloud/vitest.eval.config.ts"
+      - "packages/runtime/vitest.eval.config.ts"
       - ".github/workflows/eval.yml"
   push:
     branches: ["main"]
     paths:
-      - "packages/cloud/src/memory/**"
-      - "packages/cloud/src/search.ts"
+      - "packages/runtime/src/memory/**"
+      - "packages/runtime/src/search.ts"
       - "packages/db/src/schema.ts"
-      - "packages/cloud/vitest.eval.config.ts"
+      - "packages/runtime/vitest.eval.config.ts"
       - ".github/workflows/eval.yml"
 
 concurrency:
@@ -56,9 +41,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
-  # PHASE 1 flip switch — see the header comment. "true" = never fail the check.
-  REPORT_ONLY: "true"
-  BASELINE_PATH: packages/cloud/src/memory/evals/baseline.json
+  BASELINE_PATH: packages/runtime/src/memory/evals/baseline.json
 
 # Needed for the sticky PR comment on pull_request runs.
 permissions:
@@ -74,11 +57,9 @@ jobs:
       - name: Setup
         uses: ./tooling/github/setup
 
-      # Report-only capture: run the eval but NEVER let a below-baseline exit
-      # fail this step. `pnpm eval` exits non-zero when recall@5/MRR fall below
-      # baseline − EPSILON (or any eval test fails); we record that exit code and
-      # surface it in the report instead of failing here.
-      - name: Run eval (report-only)
+      # Capture the eval output and exit code so the report is still produced
+      # before the final enforcement step fails the job.
+      - name: Run eval
         id: run
         shell: bash
         run: |
@@ -149,14 +130,10 @@ jobs:
             echo "| MRR | ${mrr} | ${base_mrr} | ${mrr_delta} | $(badge "$mrr_status") |"
             echo
             if [ "$would_fail" = "true" ]; then
-              if [ "${REPORT_ONLY}" = "true" ]; then
-                echo "> ⚠️ **Would fail** once the eval gate is blocking (currently report-only — see \`.github/workflows/eval.yml\`)."
-              else
-                echo "> 🔴 **Below baseline — this check is blocking and has failed.**"
-              fi
+              echo "> 🔴 **Below baseline — this check is blocking and has failed.**"
               echo ">"
               echo "> If this drop is expected (intentional retrieval change), re-baseline with"
-              echo "> \`pnpm --filter @acme/cloud eval:baseline\` and commit the \`baseline.json\` diff in this PR."
+              echo "> \`pnpm --filter @acme/runtime eval:baseline\` and commit the \`baseline.json\` diff in this PR."
             else
               echo "> ✅ Meets or beats baseline (within tolerance)."
             fi
@@ -165,14 +142,14 @@ jobs:
               echo "> Note: \`pnpm eval\` exited non-zero (code \`${EVAL_EXIT}\`) — a metric fell below baseline − EPSILON, or an eval assertion failed. See the job log."
             fi
             echo
-            echo "<sub>Report-only: \`${REPORT_ONLY}\` · commit \`${GITHUB_SHA:0:7}\`</sub>"
+            echo "<sub>Gate: blocking · commit \`${GITHUB_SHA:0:7}\`</sub>"
           } | tee report.md >> "$GITHUB_STEP_SUMMARY"
 
       # One sticky comment per PR, updated on each push (no spam). Skipped on
       # main pushes — the job summary above already carries the numbers there.
       # Skipped on fork PRs too (their GITHUB_TOKEN is read-only, the post would
       # 403); continue-on-error keeps any comment hiccup from failing a
-      # report-only job — the step summary always has the numbers.
+      # blocking job — the step summary always has the numbers.
       - name: Post PR comment
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
         continue-on-error: true
@@ -181,10 +158,8 @@ jobs:
           header: retrieval-eval
           path: report.md
 
-      # PHASE 1: report-only, so this never fails. When REPORT_ONLY is flipped to
-      # "false" (Phase 2), a below-baseline / non-zero eval fails the check here.
-      - name: Enforce (blocking only when report-only is off)
-        if: ${{ steps.report.outputs.would_fail == 'true' && env.REPORT_ONLY != 'true' }}
+      - name: Enforce retrieval and scope-safety gate
+        if: ${{ steps.report.outputs.would_fail == 'true' }}
         shell: bash
         run: |
           echo "::error::Retrieval eval below baseline (recall@5 / MRR). Blocking check failed."

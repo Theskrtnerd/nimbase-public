@@ -2,19 +2,20 @@ import "server-only";
 
 import { generateText } from "ai";
 
-import type { ArtifactGenerateJobData } from "@acme/cloud";
-import { costFor, resolveModels, s3, traceGeneration } from "@acme/cloud";
+import type { ArtifactGenerateJobData } from "@acme/runtime/queue";
+import { and, eq } from "@acme/db";
+import { db } from "@acme/db/client";
+import { Artifact, SpendLedger } from "@acme/db/schema";
+import { costFor, resolveModels, traceGeneration } from "@acme/runtime/ai";
 import {
   buildHarnessMounts,
   kbSearchTool,
   resolveHarnessModel,
   runHarnessAgent,
   WikiFileSystem,
-} from "@acme/cloud/harness";
-import { WikiReadFs } from "@acme/cloud/memory/wiki";
-import { and, eq } from "@acme/db";
-import { db } from "@acme/db/client";
-import { Artifact, SpendLedger } from "@acme/db/schema";
+} from "@acme/runtime/harness";
+import { WikiReadFs } from "@acme/runtime/memory/wiki";
+import * as s3 from "@acme/runtime/s3";
 
 import type { BuiltArtifact } from "./build-artifact";
 import {

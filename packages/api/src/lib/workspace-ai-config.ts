@@ -1,11 +1,11 @@
+import { eq } from "@acme/db";
+import { db } from "@acme/db/client";
+import { WorkspaceAiConfig } from "@acme/db/schema";
 import {
   getGlobalConfig,
   isValidModelForRole,
   modelsForRole,
-} from "@acme/cloud";
-import { eq } from "@acme/db";
-import { db } from "@acme/db/client";
-import { WorkspaceAiConfig } from "@acme/db/schema";
+} from "@acme/runtime/ai";
 
 export class WorkspaceAiConfigError extends Error {
   constructor(message: string) {

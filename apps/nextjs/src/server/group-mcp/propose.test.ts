@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { proposeGroupMcpFromPrompt } from "./propose";
 
-vi.mock("@acme/cloud", () => ({
+vi.mock("@acme/runtime/ai", () => ({
   resolveModels: vi.fn(() => Promise.resolve({ chat: { id: "m", model: {} } })),
   traceGeneration: vi.fn((_m: unknown, run: () => unknown) => run()),
   costFor: vi.fn(() => 0),
 }));
-vi.mock("@acme/cloud/memory/wiki", () => ({
+vi.mock("@acme/runtime/memory/wiki", () => ({
   WikiReadFs: class {},
   readTools: () => ({}),
 }));

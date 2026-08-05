@@ -3,7 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // The authoring module reaches the DB through a fluent select chain; stub the
 // whole client so the poll loop is exercised against a scripted sequence of
 // rows. Shared by both chat-side surfaces (agent tool, group MCP endpoint).
-const rows: { status: string; error: string | null }[] = [];
+const mocks = vi.hoisted(() => ({
+  getObjectText: vi.fn(() => Promise.resolve("<!doctype html><h1>Hi</h1>")),
+}));
+const rows: {
+  status?: string;
+  error?: string | null;
+  s3KeyHtml?: string | null;
+}[] = [];
+vi.mock("@acme/runtime/s3", () => ({
+  getObjectText: mocks.getObjectText,
+}));
 vi.mock("@acme/db/client", () => ({
   db: {
     select: () => ({
@@ -130,5 +140,32 @@ describe("authorArtifact", () => {
     const result = await authorArtifact("build it", config);
     expect(result).toContain("error:");
     expect(result).toContain("model refused");
+  });
+
+  it("delegates PNG output to an injected renderer adapter", async () => {
+    rows.push(
+      { status: "draft", error: null },
+      { s3KeyHtml: "artifacts/c1.html" },
+    );
+    const add = vi.fn();
+    const render = vi.fn(() => Promise.resolve(Buffer.from("png")));
+    const result = await authorArtifact(
+      "build it",
+      {
+        ...config,
+        attachments: { add, take: () => [] },
+        renderer: { render },
+      },
+      { output: "png" },
+    );
+
+    expect(render).toHaveBeenCalledWith("<!doctype html><h1>Hi</h1>", "png");
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filename: "q3-breakdown.png",
+        mimeType: "image/png",
+      }),
+    );
+    expect(result).toContain("PNG is attached");
   });
 });

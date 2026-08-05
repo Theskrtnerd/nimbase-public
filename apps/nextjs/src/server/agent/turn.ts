@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { PathScope } from "@acme/db";
-import { resolveModels } from "@acme/cloud";
-import { readTools, WikiReadFs } from "@acme/cloud/memory/wiki";
+import { resolveModels } from "@acme/runtime/ai";
+import { readTools, WikiReadFs } from "@acme/runtime/memory/wiki";
 
 // Bound the agentic exploration per turn — KB Q&A needs far fewer steps than
 // building a artifact. Caps sit well inside the route timeout. Callers build the

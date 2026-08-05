@@ -7,10 +7,10 @@ import type {
   SourceMetadata,
 } from "@acme/db/schema";
 import { persistSourceProviderAccessPolicy } from "@acme/api/provider-access";
-import { s3 } from "@acme/cloud";
 import { and, eq } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Source } from "@acme/db/schema";
+import * as s3 from "@acme/runtime/s3";
 
 import { dispatchExtract } from "./extract-dispatch";
 import { findDuplicateSourceId, reserveCapture } from "./reserve-capture";

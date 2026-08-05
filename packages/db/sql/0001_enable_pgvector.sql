@@ -13,6 +13,6 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Cosine-distance ANN index matching the `<=>` operator used in
--- packages/cloud/src/search.ts. Created after the table exists (post-push).
+-- packages/runtime/src/search.ts. Created after the table exists (post-push).
 CREATE INDEX IF NOT EXISTS wiki_chunk_embedding_hnsw
   ON wiki_chunk USING hnsw (embedding vector_cosine_ops);
