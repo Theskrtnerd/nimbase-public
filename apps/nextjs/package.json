@@ -63,16 +63,16 @@
     "@acme/prettier-config": "workspace:*",
     "@acme/tailwind-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.62.1",
     "@types/node": "catalog:",
     "@types/react": "catalog:react19",
     "@types/react-dom": "catalog:react19",
     "eslint": "catalog:",
-    "jiti": "^2.5.1",
+    "jiti": "^2.7.0",
     "prettier": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.10"
   },
   "prettier": "@acme/prettier-config"
 }
