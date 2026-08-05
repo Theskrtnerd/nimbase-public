@@ -692,6 +692,80 @@ export const WikiNodeVersion = pgTable("wiki_node_version", (t) => ({
     .notNull(),
 }));
 
+export const memoryMutationChangeSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("upsert"),
+    path: z.string().min(1),
+    versionId: z.uuid(),
+  }),
+  z.object({
+    type: z.literal("move"),
+    from: z.string().min(1),
+    to: z.string().min(1),
+  }),
+  z.object({ type: z.literal("delete"), path: z.string().min(1) }),
+]);
+export const memoryMutationChangesSchema = z
+  .array(memoryMutationChangeSchema)
+  .min(1);
+export type MemoryMutationChange = z.infer<typeof memoryMutationChangeSchema>;
+
+// Durable source for the workspace's Git history. The visible memory change
+// and this row are committed in one database batch; Git object creation is a
+// retryable projection and therefore cannot make a memory write unavailable.
+export const MemoryMutation = pgTable(
+  "memory_mutation",
+  (t) => ({
+    sequence: t.bigserial({ mode: "number" }).notNull(),
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid("workspace_id")
+      .notNull()
+      .references(() => Workspace.id, { onDelete: "cascade" }),
+    changes: t.jsonb().notNull().$type<MemoryMutationChange[]>(),
+    message: t.text().notNull(),
+    sourceId: t
+      .uuid("source_id")
+      .references(() => Source.id, { onDelete: "set null" }),
+    // Kept as an attribution value rather than an FK: compile jobs are
+    // operational records whose retention must not rewrite memory history.
+    jobId: t.uuid("job_id"),
+    gitCommitSha: t.text("git_commit_sha"),
+    projectedAt: t.timestamp("projected_at", { withTimezone: true }),
+    projectionAttempts: t.integer("projection_attempts").notNull().default(0),
+    projectionError: t.text("projection_error"),
+    createdAt: t
+      .timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }),
+  (table) => [
+    uniqueIndex("memory_mutation_sequence_idx").on(table.sequence),
+    index("memory_mutation_workspace_pending_idx")
+      .on(table.workspaceId, table.sequence)
+      .where(sql`${table.projectedAt} is null`),
+  ],
+);
+
+// Materialized projection cursor. `entries` maps memory paths to Git blob
+// object ids; `revision` is the compare-and-swap token that prevents two
+// projectors from advancing the same workspace ref concurrently.
+export const MemoryGitRef = pgTable("memory_git_ref", (t) => ({
+  workspaceId: t
+    .uuid("workspace_id")
+    .notNull()
+    .primaryKey()
+    .references(() => Workspace.id, { onDelete: "cascade" }),
+  headSha: t.text("head_sha"),
+  entries: t.jsonb().notNull().$type<Record<string, string>>().default({}),
+  revision: t.integer().notNull().default(0),
+  updatedAt: t
+    .timestamp("updated_at", { mode: "date", withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
+}));
+
 // --- wiki_chunk: heading-aware chunks + embeddings for retrieval ---
 export const WikiChunk = pgTable("wiki_chunk", (t) => ({
   id: t.uuid().notNull().primaryKey().defaultRandom(),

@@ -1,23 +1,29 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import type { PathScope } from "@acme/db";
 import type { NodeSourceRef } from "@acme/db/node-metadata";
+import type { MemoryMutationChange } from "@acme/db/schema";
 import { and, eq, inArray, isNull, sql } from "@acme/db";
 import { pathInScopes } from "@acme/db/access-core";
 import { db } from "@acme/db/client";
 import { loadNodeSources } from "@acme/db/node-metadata";
 import {
   AccessGrant,
+  MemoryMutation,
   Source,
   WikiNode,
   WikiNodeSource,
   WikiNodeTag,
   WikiNodeVersion,
+  Workspace,
 } from "@acme/db/schema";
 
 import type { ParsedOkf } from "../okf/codec";
 import { indexNodeVersion } from "../../index-node-version";
 import * as s3 from "../../s3";
+import { notifyMemoryGitProjection } from "../git-dispatch";
 import {
   parseOkf,
   projectToDb,
@@ -66,6 +72,20 @@ interface NodeRow {
   currentVersionId: string | null;
   summary: string | null;
   s3Key: string | null;
+}
+
+interface WriteVersionInput {
+  nodeId: string;
+  path: string;
+  parsed: ParsedOkf;
+  summary: string;
+  currentTitle: string;
+  mutationMessage: string;
+  newNode?: {
+    path: string;
+    kind: "note" | "dataset";
+    title: string;
+  };
 }
 
 // One fence-visible live node, as exposed to the harness filesystem adapter.
@@ -299,6 +319,29 @@ export class GardenerFs extends WikiReadFs {
     }
   }
 
+  private mutationOrderLock() {
+    return db
+      .select({ id: Workspace.id })
+      .from(Workspace)
+      .where(eq(Workspace.id, this.workspaceId))
+      .for("update");
+  }
+
+  private prepareMutation(changes: MemoryMutationChange[], message: string) {
+    const id = randomUUID();
+    return {
+      id,
+      statement: db.insert(MemoryMutation).values({
+        id,
+        workspaceId: this.workspaceId,
+        changes,
+        message,
+        sourceId: this.sourceId,
+        jobId: this.jobId,
+      }),
+    };
+  }
+
   // Shared guard for subtree-wide mutations (mv/rm): resolves the subtree rooted
   // at `path`, then refuses empty/pinned/restricted/grant-anchored subtrees with
   // the verb baked into the messages. `mustNotExist` (mv's destination) is
@@ -381,29 +424,31 @@ export class GardenerFs extends WikiReadFs {
     // frontmatter `type` (unknown types → "note").
     const kind = kindForType(parsed.meta.type);
 
-    const { nodeId, currentTitle } = existing
-      ? { nodeId: existing.id, currentTitle: existing.title }
-      : await (async () => {
-          const insertedTitle = parsed.meta.title ?? null;
-          if (!insertedTitle) {
-            throw new VfsError(
-              `new notes must declare a title via frontmatter — add "---\\ntitle: My Note\\n---" to the top of the body for "${path}"`,
-            );
-          }
-          const [node] = await db
-            .insert(WikiNode)
-            .values({
-              workspaceId: this.workspaceId,
-              path,
-              kind,
-              title: insertedTitle,
-            })
-            .returning({ id: WikiNode.id });
-          if (!node) throw new Error("failed to insert wiki_node");
-          return { nodeId: node.id, currentTitle: insertedTitle };
-        })();
+    const insertedTitle = parsed.meta.title ?? null;
+    if (!existing && !insertedTitle) {
+      throw new VfsError(
+        `new notes must declare a title via frontmatter — add "---\\ntitle: My Note\\n---" to the top of the body for "${path}"`,
+      );
+    }
+    const nodeId = existing?.id ?? randomUUID();
+    const currentTitle = existing?.title ?? insertedTitle;
+    if (!currentTitle) throw new Error("memory title invariant failed");
 
-    await this.writeVersion(nodeId, path, parsed, summary, currentTitle);
+    await this.writeVersion({
+      nodeId,
+      path,
+      parsed,
+      summary,
+      currentTitle,
+      mutationMessage: `${existing ? "Update" : "Create"} ${path}`,
+      newNode: existing
+        ? undefined
+        : {
+            path,
+            kind,
+            title: currentTitle,
+          },
+    });
     this.recordedOps.push({
       op: existing ? "update" : "create",
       kind,
@@ -438,13 +483,14 @@ export class GardenerFs extends WikiReadFs {
     }
 
     const parsed = parseOkf(body.replace(oldText, newText));
-    await this.writeVersion(
-      node.id,
+    await this.writeVersion({
+      nodeId: node.id,
       path,
       parsed,
-      node.summary ?? "",
-      node.title,
-    );
+      summary: node.summary ?? "",
+      currentTitle: node.title,
+      mutationMessage: `Edit ${path}`,
+    });
     this.recordedOps.push({
       op: "update",
       kind: kindForType(parsed.meta.type),
@@ -472,13 +518,14 @@ export class GardenerFs extends WikiReadFs {
     const parsed = parseOkf(await this.read(path));
     if (normalized.length > 0) parsed.meta.tags = normalized;
     else delete parsed.meta.tags;
-    await this.writeVersion(
-      node.id,
+    await this.writeVersion({
+      nodeId: node.id,
       path,
       parsed,
-      node.summary ?? "",
-      node.title,
-    );
+      summary: node.summary ?? "",
+      currentTitle: node.title,
+      mutationMessage: `Update tags for ${path}`,
+    });
     return normalized.length > 0
       ? `tagged "${path}": ${normalized.join(", ")}`
       : `cleared tags on "${path}"`;
@@ -505,13 +552,14 @@ export class GardenerFs extends WikiReadFs {
     }
     const parsed = parseOkf(await this.read(path));
     parsed.meta.title = normalized;
-    await this.writeVersion(
-      node.id,
+    await this.writeVersion({
+      nodeId: node.id,
       path,
       parsed,
-      node.summary ?? "",
-      node.title,
-    );
+      summary: node.summary ?? "",
+      currentTitle: node.title,
+      mutationMessage: `Update title for ${path}`,
+    });
     return `titled "${path}": ${normalized}`;
   }
 
@@ -557,13 +605,14 @@ export class GardenerFs extends WikiReadFs {
         ...validIds.map(sourceUriFor),
       ]),
     ];
-    await this.writeVersion(
-      node.id,
+    await this.writeVersion({
+      nodeId: node.id,
       path,
       parsed,
-      node.summary ?? "",
-      node.title,
-    );
+      summary: node.summary ?? "",
+      currentTitle: node.title,
+      mutationMessage: `Update citations for ${path}`,
+    });
 
     const skipped = unique.length - validIds.length;
     return skipped > 0
@@ -598,23 +647,35 @@ export class GardenerFs extends WikiReadFs {
     // One UPDATE so the subtree rename is atomic (neon-http has no
     // interactive transactions). substring() is 1-indexed: for the exact
     // match the suffix is empty; for children it keeps "/rest/of/path".
-    await db
-      .update(WikiNode)
-      .set({
-        path: sql`${to} || substring(${WikiNode.path} from ${from.length + 1})`,
-      })
-      .where(
-        and(
-          eq(WikiNode.workspaceId, this.workspaceId),
-          isNull(WikiNode.deletedAt),
-          inArray(
-            WikiNode.id,
-            scope.map((n) => n.id),
+    const mutation = this.prepareMutation(
+      [{ type: "move", from, to }],
+      `Move ${from} to ${to}`,
+    );
+    await db.batch([
+      this.mutationOrderLock(),
+      db
+        .update(WikiNode)
+        .set({
+          path: sql`${to} || substring(${WikiNode.path} from ${from.length + 1})`,
+        })
+        .where(
+          and(
+            eq(WikiNode.workspaceId, this.workspaceId),
+            isNull(WikiNode.deletedAt),
+            inArray(
+              WikiNode.id,
+              scope.map((n) => n.id),
+            ),
           ),
         ),
-      );
+      mutation.statement,
+    ]);
 
     for (const n of scope) this.bodyCache.delete(n.path);
+    await notifyMemoryGitProjection({
+      mutationId: mutation.id,
+      workspaceId: this.workspaceId,
+    });
     return `moved ${scope.length} note(s) from "${from}" to "${to}"`;
   }
 
@@ -623,21 +684,33 @@ export class GardenerFs extends WikiReadFs {
 
     const scope = await this.assertSubtreeMutable(path, "delete");
 
-    await db
-      .update(WikiNode)
-      .set({ deletedAt: new Date() })
-      .where(
-        and(
-          eq(WikiNode.workspaceId, this.workspaceId),
-          isNull(WikiNode.deletedAt),
-          inArray(
-            WikiNode.id,
-            scope.map((n) => n.id),
+    const mutation = this.prepareMutation(
+      [{ type: "delete", path }],
+      `Delete ${path}`,
+    );
+    await db.batch([
+      this.mutationOrderLock(),
+      db
+        .update(WikiNode)
+        .set({ deletedAt: new Date() })
+        .where(
+          and(
+            eq(WikiNode.workspaceId, this.workspaceId),
+            isNull(WikiNode.deletedAt),
+            inArray(
+              WikiNode.id,
+              scope.map((n) => n.id),
+            ),
           ),
         ),
-      );
+      mutation.statement,
+    ]);
 
     for (const n of scope) this.bodyCache.delete(n.path);
+    await notifyMemoryGitProjection({
+      mutationId: mutation.id,
+      workspaceId: this.workspaceId,
+    });
     this.recordedOps.push({
       op: "delete",
       path,
@@ -646,8 +719,8 @@ export class GardenerFs extends WikiReadFs {
     return `deleted ${scope.length} note(s) at "${path}" (soft delete — recoverable)`;
   }
 
-  // Append-only version flow, identical to the original compile path:
-  // version row → S3 body → s3Key backfill → currentVersionId flip → index.
+  // Append-only version flow: immutable S3 body → one atomic batch containing
+  // the version, live node pointer, and mutation journal → derived indexes.
   // The OKF pipeline — every stored body funnels through here. Callers hand
   // over a ParsedOkf (parse once, mutate meta); this stamps server-owned
   // fields (title fallback, description from the write's summary, timestamp,
@@ -655,13 +728,16 @@ export class GardenerFs extends WikiReadFs {
   // frontmatter into the derived Postgres index (title/kind on wiki_node,
   // summary on the version, wiki_node_tag, wiki_node_source). Frontmatter is
   // canonical; the DB never diverges from it.
-  private async writeVersion(
-    nodeId: string,
-    path: string,
-    parsed: ParsedOkf,
-    summary: string,
-    currentTitle: string,
-  ): Promise<void> {
+  private async writeVersion(input: WriteVersionInput): Promise<void> {
+    const {
+      nodeId,
+      path,
+      parsed,
+      summary,
+      currentTitle,
+      mutationMessage,
+      newNode,
+    } = input;
     const { meta, content } = parsed;
     // Server-owned stamping is entirely the registry's `stamp` policy
     // (okf/schema.ts): title and description fall back to these values only
@@ -678,44 +754,68 @@ export class GardenerFs extends WikiReadFs {
     const projected = projectToDb(meta);
     const versionSummary = projected.summary ?? "";
 
-    const [version] = await db
-      .insert(WikiNodeVersion)
-      .values({
-        nodeId,
-        workspaceId: this.workspaceId,
-        s3Key: "", // set after we know the version id
-        summary: versionSummary,
-        sourceId: this.sourceId,
-      })
-      .returning({ id: WikiNodeVersion.id });
-    if (!version) throw new Error("failed to insert wiki_node_version");
-
-    const bodyKey = s3.s3KeyFor.wikiBody(this.workspaceId, version.id);
+    const versionId = randomUUID();
+    const bodyKey = s3.s3KeyFor.wikiBody(this.workspaceId, versionId);
     await s3.putObject(bodyKey, stored, "text/markdown");
 
-    await db
-      .update(WikiNodeVersion)
-      .set({ s3Key: bodyKey })
-      .where(eq(WikiNodeVersion.id, version.id));
+    const mutation = this.prepareMutation(
+      [{ type: "upsert", path, versionId }],
+      mutationMessage,
+    );
     // Title and kind live directly on WikiNode (unlike tags/sources, no
     // separate index table), so they ride the same atomic update as
     // currentVersionId rather than a best-effort side call.
-    await db
+    const insertVersion = db.insert(WikiNodeVersion).values({
+      id: versionId,
+      nodeId,
+      workspaceId: this.workspaceId,
+      s3Key: bodyKey,
+      summary: versionSummary,
+      sourceId: this.sourceId,
+    });
+    const updateNode = db
       .update(WikiNode)
       .set({
-        currentVersionId: version.id,
+        currentVersionId: versionId,
         title: projected.title ?? currentTitle,
         kind: projected.kind,
       })
       .where(eq(WikiNode.id, nodeId));
+    // A workspace row lock makes the global mutation sequence agree with the
+    // committed per-workspace write order, even when separate paths are
+    // updated concurrently. The projector can therefore stay strictly linear.
+    if (newNode) {
+      await db.batch([
+        this.mutationOrderLock(),
+        db.insert(WikiNode).values({
+          id: nodeId,
+          workspaceId: this.workspaceId,
+          ...newNode,
+        }),
+        insertVersion,
+        updateNode,
+        mutation.statement,
+      ]);
+    } else {
+      await db.batch([
+        this.mutationOrderLock(),
+        insertVersion,
+        updateNode,
+        mutation.statement,
+      ]);
+    }
 
     this.bodyCache.set(path, stored);
+    await notifyMemoryGitProjection({
+      mutationId: mutation.id,
+      workspaceId: this.workspaceId,
+    });
 
     // Best-effort indexing — the write already succeeded; an embedding
     // hiccup must not fail the compile job. Backfill re-indexes later.
     try {
       await indexNodeVersion({
-        nodeVersionId: version.id,
+        nodeVersionId: versionId,
         workspaceId: this.workspaceId,
         kind: projected.kind,
         body: stored,

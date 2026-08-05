@@ -6,6 +6,7 @@ import {
   compileJobSchema,
   crawlJobSchema,
   extractJobSchema,
+  memoryGitProjectionJobSchema,
 } from "./queue";
 
 // These schemas are the wire contract for every QStash job: the publisher sends
@@ -30,6 +31,11 @@ describe("job payload schemas round-trip every field", () => {
   it("round-trips a canonical compile job", () => {
     const payload = { jobId: "j1", workspaceId: "w1", sourceId: "s1" };
     expect(compileJobSchema.parse(payload)).toEqual(payload);
+  });
+
+  it("round-trips a memory Git projection job", () => {
+    const payload = { jobId: "m1", workspaceId: "w1" };
+    expect(memoryGitProjectionJobSchema.parse(payload)).toEqual(payload);
   });
 
   it("round-trips the remaining job payloads", () => {

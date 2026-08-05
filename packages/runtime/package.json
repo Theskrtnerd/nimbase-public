@@ -71,6 +71,10 @@
       "types": "./dist/memory/index.d.ts",
       "default": "./src/memory/index.ts"
     },
+    "./memory/git-history": {
+      "types": "./dist/memory/git-history.d.ts",
+      "default": "./src/memory/git-history.ts"
+    },
     "./harness": {
       "types": "./dist/harness/index.d.ts",
       "default": "./src/harness/index.ts"
@@ -114,6 +118,8 @@
     "eval:refresh": "tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/memory/evals/refresh-embeddings.ts",
     "migrate:okf-datasets": "tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/scripts/migrate-okf-datasets.ts",
     "reproject:okf": "tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/scripts/reproject-okf.ts",
+    "project:memory-git-history": "infisical run --env dev -- tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/scripts/project-memory-git-history.ts",
+    "project:memory-git-history:prod": "infisical run --env prod -- tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/scripts/project-memory-git-history.ts",
     "eval:refresh:real": "infisical run --env dev -- tsx --import ./src/memory/evals/register-tsx-hooks.mjs src/memory/evals/refresh-embeddings.ts --real",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },

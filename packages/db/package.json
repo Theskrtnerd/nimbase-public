@@ -74,6 +74,8 @@
     "migrate:onboarding:prod": "dotenv -e ../../.env.production -- tsx src/scripts/apply-onboarding.ts",
     "migrate:provider-access": "pnpm migrate:company-identity && infisical run --env dev -- tsx src/scripts/apply-provider-access.ts",
     "migrate:provider-access:prod": "pnpm migrate:company-identity:prod && infisical run --env prod -- tsx src/scripts/apply-provider-access.ts",
+    "migrate:memory-git-history": "infisical run --env dev -- tsx src/scripts/apply-memory-git-history.ts && pnpm --filter @acme/runtime project:memory-git-history",
+    "migrate:memory-git-history:prod": "infisical run --env prod -- tsx src/scripts/apply-memory-git-history.ts && pnpm --filter @acme/runtime project:memory-git-history:prod",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "tsc",
     "format": "prettier --check . --ignore-path ../../.gitignore",

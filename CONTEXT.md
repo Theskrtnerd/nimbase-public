@@ -27,6 +27,12 @@ decisions; historical plans do not override it.
   is a security fence, not a manually authored presentation or reader model.
 - **Memory** — durable OKF markdown compiled from sources. Object storage is
   authoritative; Postgres is its derived retrieval index.
+- **MemoryMutation** — an append-only record of one visible memory change,
+  committed atomically with that change. It is the durable source for history
+  projections and includes content, metadata, moves, and deletes.
+- **Memory Git history** — one linear, standard Git commit history per
+  workspace, derived from `MemoryMutation` records. It is portable audit and
+  synchronization state, not a competing canonical memory store.
 - **Held source** — provider evidence retained for authorized raw access but
   deliberately excluded from compilation until derived memory can preserve
   and evaluate changing policy safely.

@@ -34,6 +34,19 @@ it("publishes to /api/compile with dedup id, retries, and per-workspace flow con
   });
 });
 
+it("publishes memory Git projection with per-workspace serialization", async () => {
+  const { publishMemoryGitProjection } = await import("./queue");
+  const projection = { jobId: "m1", workspaceId: "w1" };
+  await publishMemoryGitProjection(projection);
+  expect(publishJSON).toHaveBeenCalledWith({
+    url: "https://app.example.com/api/memory/git/project",
+    body: projection,
+    deduplicationId: "memory-git-m1",
+    retries: 3,
+    flowControl: { key: "memory-git-w1", parallelism: 1 },
+  });
+});
+
 it("throws when NIMBASE_WEB_URL is unset", async () => {
   delete process.env.NIMBASE_WEB_URL;
   const { publishCompile } = await import("./queue");

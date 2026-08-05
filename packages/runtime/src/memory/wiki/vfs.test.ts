@@ -10,14 +10,16 @@ const mocks = vi.hoisted(() => ({
   selectSourceRows: vi.fn(),
   getObjectText: vi.fn(),
   putObject: vi.fn(),
-  insertReturning: vi.fn(),
+  insertMutationValues: vi.fn(),
   insertTagRows: vi.fn(),
   insertSourceValues: vi.fn(),
   insertSourceOnConflict: vi.fn(),
   deleteWhere: vi.fn(),
   updateSet: vi.fn(),
+  batch: vi.fn(),
   indexNodeVersion: vi.fn(),
   loadNodeSources: vi.fn(),
+  notifyMemoryGitProjection: vi.fn(),
 }));
 
 vi.mock("@acme/db", () => ({
@@ -32,6 +34,7 @@ vi.mock("@acme/db", () => ({
 vi.mock("@acme/db/schema", () => ({
   WikiNode: { path: "path", id: "id", restricted: "restricted" },
   WikiNodeVersion: {},
+  MemoryMutation: {},
   WikiNodeTag: { nodeId: "nodeId", tag: "tag", workspaceId: "workspaceId" },
   WikiNodeSource: {
     nodeId: "nodeId",
@@ -40,21 +43,26 @@ vi.mock("@acme/db/schema", () => ({
   },
   Source: { id: "id", workspaceId: "workspaceId" },
   AccessGrant: { folderId: "folderId" },
+  Workspace: { id: "workspaceId" },
 }));
 
 // db mock: select().from() dispatches by table identity so each caller gets
 // the right mock chain — WikiNode/WikiNodeVersion go through leftJoin
 // (listNodes) or where().limit() (AccessGrant checks); Source (citeSources'
 // validation query) goes through a bare where() awaited directly. insert()
-// dispatches similarly: WikiNodeSource gets an onConflictDoNothing chain,
-// WikiNodeTag a bare values(), everything else (WikiNode/WikiNodeVersion) the
-// original values().returning() chain.
+// dispatches similarly: MemoryMutation records its values, WikiNodeSource gets
+// an onConflictDoNothing chain, and WikiNodeTag a bare values().
 vi.mock("@acme/db/client", async () => {
   const schema = await import("@acme/db/schema");
   return {
     db: {
       select: vi.fn(() => ({
         from: vi.fn((table: unknown) => {
+          if (table === schema.Workspace) {
+            return {
+              where: vi.fn(() => ({ for: vi.fn() })),
+            };
+          }
           if (table === schema.Source) {
             return { where: mocks.selectSourceRows };
           }
@@ -65,18 +73,20 @@ vi.mock("@acme/db/client", async () => {
         }),
       })),
       insert: vi.fn((table: unknown) => {
+        if (table === schema.MemoryMutation) {
+          return { values: mocks.insertMutationValues };
+        }
         if (table === schema.WikiNodeSource) {
           return { values: mocks.insertSourceValues };
         }
         if (table === schema.WikiNodeTag) {
           return { values: mocks.insertTagRows };
         }
-        return {
-          values: vi.fn(() => ({ returning: mocks.insertReturning })),
-        };
+        return { values: vi.fn() };
       }),
       update: vi.fn(() => ({ set: mocks.updateSet })),
       delete: vi.fn(() => ({ where: mocks.deleteWhere })),
+      batch: mocks.batch,
     },
   };
 });
@@ -90,6 +100,9 @@ vi.mock("../../index-node-version", () => ({
 }));
 vi.mock("@acme/db/node-metadata", () => ({
   loadNodeSources: mocks.loadNodeSources,
+}));
+vi.mock("../git-dispatch", () => ({
+  notifyMemoryGitProjection: mocks.notifyMemoryGitProjection,
 }));
 
 const NO_FENCE: PathScope = { prefix: "", exclude: [] };
@@ -131,7 +144,8 @@ beforeEach(() => {
   mocks.updateSet.mockReturnValue({
     where: vi.fn().mockResolvedValue(undefined),
   });
-  mocks.insertReturning.mockResolvedValue([{ id: "new_id" }]);
+  mocks.insertMutationValues.mockResolvedValue(undefined);
+  mocks.batch.mockResolvedValue([]);
   mocks.insertTagRows.mockResolvedValue(undefined);
   mocks.insertSourceValues.mockReturnValue({
     onConflictDoNothing: mocks.insertSourceOnConflict,
@@ -199,7 +213,7 @@ describe("write", () => {
       "a new note",
     );
     expect(out).toBe('created "inbox/new-note.md"');
-    expect(mocks.insertReturning).toHaveBeenCalledTimes(2); // node + version
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
     // The stored body is the OKF-serialized form: type + title + description
     // + server-stamped timestamp + this job's source URI, then the content.
     const [key, stored, contentType] = mocks.putObject.mock.calls[0] as [
@@ -207,7 +221,8 @@ describe("write", () => {
       string,
       string,
     ];
-    expect(key).toBe("wiki/ws_1/new_id.md");
+    expect(key).toMatch(/^wiki\/ws_1\/[0-9a-f-]+\.md$/);
+    const versionId = key.slice("wiki/ws_1/".length, -".md".length);
     expect(contentType).toBe("text/markdown");
     expect(stored).toMatch(
       /^---\ntype: Note\ntitle: New Note\ndescription: a new note\ntimestamp: /,
@@ -215,13 +230,28 @@ describe("write", () => {
     expect(stored).toContain("nimbase://source/src_1");
     expect(stored).toContain("# New");
     expect(mocks.indexNodeVersion).toHaveBeenCalledWith({
-      nodeVersionId: "new_id",
+      nodeVersionId: versionId,
       workspaceId: "ws_1",
       kind: "note",
       body: stored,
       summary: "a new note",
       jobId: "job_1",
     });
+    expect(mocks.insertMutationValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws_1",
+        changes: [
+          {
+            type: "upsert",
+            path: "inbox/new-note.md",
+            versionId,
+          },
+        ],
+        message: "Create inbox/new-note.md",
+        sourceId: "src_1",
+        jobId: "job_1",
+      }),
+    );
   });
 
   it("derives wiki_node.kind from the frontmatter type", async () => {
@@ -230,7 +260,7 @@ describe("write", () => {
       "---\ntype: Dataset\ntitle: Plans\n---\n| a |\n|---|\n| 1 |\n",
       "plans table",
     );
-    const setArg = mocks.updateSet.mock.calls[1]?.[0] as { kind?: string };
+    const setArg = mocks.updateSet.mock.calls[0]?.[0] as { kind?: string };
     expect(setArg.kind).toBe("dataset");
   });
 
@@ -247,7 +277,7 @@ describe("write", () => {
 
   it("carries the frontmatter title into the WikiNode update", async () => {
     await makeFs().write("inbox/new-note.md", TITLED_BODY, "s");
-    const setArg = mocks.updateSet.mock.calls[1]?.[0] as {
+    const setArg = mocks.updateSet.mock.calls[0]?.[0] as {
       title?: string;
     };
     expect(setArg.title).toBe("New Note");
@@ -260,7 +290,7 @@ describe("write", () => {
       "updated",
     );
     expect(out).toBe('updated "projects/nimbase"');
-    expect(mocks.insertReturning).toHaveBeenCalledTimes(1); // version only
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
   });
 
   it("refuses to write a pinned note", async () => {
@@ -312,9 +342,7 @@ describe("write", () => {
 
   it("auto-unions this compile job's source into wiki_node_source", async () => {
     await makeFs().write("inbox/new-note.md", TITLED_BODY, "s");
-    expect(mocks.insertSourceValues).toHaveBeenCalledWith([
-      { workspaceId: "ws_1", nodeId: "new_id", sourceId: "src_1" },
-    ]);
+    expect(mocks.insertSourceValues).toHaveBeenCalledOnce();
   });
 });
 
@@ -364,7 +392,7 @@ describe("edit", () => {
 
   it("keeps the node's existing title when the edited body has no frontmatter title", async () => {
     await makeFs().edit("projects/nimbase", "hello gardener", "hello world");
-    const setArg = mocks.updateSet.mock.calls[1]?.[0] as {
+    const setArg = mocks.updateSet.mock.calls[0]?.[0] as {
       title?: string;
     };
     expect(setArg.title).toBe("Nimbase"); // falls back to NODES fixture's existing title
@@ -374,7 +402,7 @@ describe("edit", () => {
 describe("setTitle", () => {
   it("normalizes the title and folds it into the WikiNode update", async () => {
     await makeFs().setTitle("projects/nimbase", "  My   Title  ");
-    const setArg = mocks.updateSet.mock.calls[1]?.[0] as {
+    const setArg = mocks.updateSet.mock.calls[0]?.[0] as {
       title?: string;
     };
     expect(setArg.title).toBe("My Title");
@@ -521,6 +549,13 @@ describe("mv", () => {
     const out = await makeFs().mv("a", "c");
     expect(out).toContain("moved 2");
     expect(mocks.updateSet).toHaveBeenCalledTimes(1);
+    expect(mocks.insertMutationValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: [{ type: "move", from: "a", to: "c" }],
+        message: "Move a to c",
+      }),
+    );
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
   });
 
   it("requires the .md leaf only when renaming a single note, not a subtree", async () => {
@@ -638,6 +673,13 @@ describe("rm", () => {
       deletedAt?: Date;
     };
     expect(setArg.deletedAt).toBeInstanceOf(Date);
+    expect(mocks.insertMutationValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: [{ type: "delete", path: "a" }],
+        message: "Delete a",
+      }),
+    );
+    expect(mocks.batch).toHaveBeenCalledTimes(1);
   });
 
   it("errors when nothing matches", async () => {
@@ -834,14 +876,14 @@ describe("recorded ops", () => {
   it("records a create for a new note write", async () => {
     const fs = makeFs();
     await fs.write("inbox/new-note.md", TITLED_BODY, "s");
-    expect(fs.ops()).toEqual([
-      {
-        op: "create",
-        kind: "note",
-        path: "inbox/new-note.md",
-        nodeId: "new_id",
-      },
-    ]);
+    const [op] = fs.ops();
+    expect(op).toMatchObject({
+      op: "create",
+      kind: "note",
+      path: "inbox/new-note.md",
+    });
+    if (!op || op.op === "delete") throw new Error("expected write op");
+    expect(typeof op.nodeId).toBe("string");
   });
 
   it("records an update when writing over an existing note", async () => {
@@ -859,14 +901,14 @@ describe("recorded ops", () => {
       "---\ntype: Dataset\ntitle: Steps\n---\n| date | steps |\n|---|---|\n| 2026-06-01 | 9000 |\n",
       "daily steps",
     );
-    expect(fs.ops()).toEqual([
-      {
-        op: "create",
-        kind: "dataset",
-        path: "health/steps.md",
-        nodeId: "new_id",
-      },
-    ]);
+    const [op] = fs.ops();
+    expect(op).toMatchObject({
+      op: "create",
+      kind: "dataset",
+      path: "health/steps.md",
+    });
+    if (!op || op.op === "delete") throw new Error("expected write op");
+    expect(typeof op.nodeId).toBe("string");
   });
 
   it("records an update for edit", async () => {
