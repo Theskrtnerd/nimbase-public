@@ -49,4 +49,16 @@ describe("hasUnsafeScript", () => {
   it("rejects an unclosed script tag", () => {
     expect(hasUnsafeScript("<script>alert(1)")).toBe(true);
   });
+  it("rejects malformed script end tags", () => {
+    expect(
+      hasUnsafeScript(
+        `<script src="${artifactRuntimeUrl("tailwind")}"></script\t\n bar>`,
+      ),
+    ).toBe(true);
+  });
+  it("rejects scripts hidden inside templates", () => {
+    expect(
+      hasUnsafeScript("<template><script>alert(1)</script></template>"),
+    ).toBe(true);
+  });
 });

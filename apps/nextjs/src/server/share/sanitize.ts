@@ -1,3 +1,6 @@
+import type { DefaultTreeAdapterTypes } from "parse5";
+import { parseFragment } from "parse5";
+
 import { artifactRuntimeUrl } from "@acme/runtime/artifact-runtime";
 
 // Claude sometimes wraps the document in a ```html ... ``` markdown fence despite
@@ -16,17 +19,63 @@ export function stripCodeFence(text: string): string {
 // fail closed. The served document is additionally protected by an
 // opaque-origin sandbox and a network-denying CSP.
 export function hasUnsafeScript(html: string): boolean {
-  const openTags = html.match(/<script\b/gi)?.length ?? 0;
-  const scriptTags = html.match(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi) ?? [];
-  if (scriptTags.length !== openTags) return openTags > 0;
+  const document = parseFragment(html, { sourceCodeLocationInfo: true });
+  return containsUnsafeScript(document, html);
+}
 
-  const allowedSource = artifactRuntimeUrl("tailwind").replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\$&",
+function containsUnsafeScript(
+  node: DefaultTreeAdapterTypes.Node,
+  source: string,
+): boolean {
+  if ("tagName" in node && node.tagName === "script") {
+    return !isAllowedRuntimeScript(node, source);
+  }
+
+  if ("childNodes" in node) {
+    if (node.childNodes.some((child) => containsUnsafeScript(child, source))) {
+      return true;
+    }
+  }
+
+  // parse5 stores a template's parsed children in `content`, not childNodes.
+  if (isTemplateNode(node)) {
+    return containsUnsafeScript(node.content, source);
+  }
+
+  return false;
+}
+
+function isTemplateNode(
+  node: DefaultTreeAdapterTypes.Node,
+): node is DefaultTreeAdapterTypes.Template {
+  return "tagName" in node && node.tagName === "template";
+}
+
+function isAllowedRuntimeScript(
+  node: DefaultTreeAdapterTypes.Element,
+  source: string,
+): boolean {
+  const location = node.sourceCodeLocation;
+  if (!location?.startTag || !location.endTag) return false;
+
+  const startTag = source.slice(
+    location.startTag.startOffset,
+    location.startTag.endOffset,
   );
-  const allowed = new RegExp(
-    `^<script\\s+src=(?:"${allowedSource}"|'${allowedSource}')\\s*>\\s*<\\/script\\s*>$`,
-    "i",
+  const endTag = source.slice(
+    location.endTag.startOffset,
+    location.endTag.endOffset,
   );
-  return scriptTags.some((tag) => !allowed.test(tag));
+  const body = source.slice(
+    location.startTag.endOffset,
+    location.endTag.startOffset,
+  );
+  const runtimeUrl = artifactRuntimeUrl("tailwind");
+
+  return (
+    (startTag === `<script src="${runtimeUrl}">` ||
+      startTag === `<script src='${runtimeUrl}'>`) &&
+    endTag === "</script>" &&
+    body.trim().length === 0
+  );
 }
