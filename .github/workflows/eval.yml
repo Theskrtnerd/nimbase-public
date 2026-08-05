@@ -57,6 +57,9 @@ jobs:
       - name: Setup
         uses: ./tooling/github/setup
 
+      - name: Build eval workspace dependencies
+        run: pnpm --filter @nimbase/connector-sdk build
+
       # Capture the eval output and exit code so the report is still produced
       # before the final enforcement step fails the job.
       - name: Run eval
