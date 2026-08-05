@@ -13,6 +13,14 @@ export const compileJobSchema = z.object({
 });
 export type CompileJobData = z.infer<typeof compileJobSchema>;
 
+export const memoryGitProjectionJobSchema = z.object({
+  jobId: z.string(),
+  workspaceId: z.string(),
+});
+export type MemoryGitProjectionJobData = z.infer<
+  typeof memoryGitProjectionJobSchema
+>;
+
 let qstashClient: Client | null = null;
 
 function qstash(): Client {
@@ -34,6 +42,20 @@ export async function publishCompile(data: CompileJobData): Promise<void> {
     // on one workspace must never interleave. neon-http can't hold locks
     // across a job, so serialization lives here at the queue.
     flowControl: { key: `compile-${data.workspaceId}`, parallelism: 1 },
+  });
+}
+
+export async function publishMemoryGitProjection(
+  data: MemoryGitProjectionJobData,
+): Promise<void> {
+  const base = process.env.NIMBASE_WEB_URL;
+  if (!base) throw new Error("NIMBASE_WEB_URL is not set");
+  await qstash().publishJSON({
+    url: `${base}/api/memory/git/project`,
+    body: data,
+    deduplicationId: `memory-git-${data.jobId}`,
+    retries: 3,
+    flowControl: { key: `memory-git-${data.workspaceId}`, parallelism: 1 },
   });
 }
 

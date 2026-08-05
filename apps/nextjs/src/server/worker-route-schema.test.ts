@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 // way — a reintroduced local `z.object` for the body would restore the drift.
 const WORKER_ROUTES = [
   ["compile/route.ts", "compileJobSchema"],
+  ["memory/git/project/route.ts", "memoryGitProjectionJobSchema"],
   ["extract/route.ts", "extractJobSchema"],
   ["crawl/route.ts", "crawlJobSchema"],
   ["artifacts/generate/route.ts", "artifactGenerateJobSchema"],

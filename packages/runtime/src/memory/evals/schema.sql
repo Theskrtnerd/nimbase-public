@@ -64,6 +64,33 @@ CREATE TABLE wiki_node_version (
   created_at timestamptz DEFAULT now() NOT NULL
 );
 
+CREATE TABLE memory_mutation (
+  sequence bigserial UNIQUE NOT NULL,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES workspace(id) ON DELETE CASCADE,
+  changes jsonb NOT NULL,
+  message text NOT NULL,
+  source_id uuid REFERENCES source(id) ON DELETE SET NULL,
+  job_id uuid,
+  git_commit_sha text,
+  projected_at timestamptz,
+  projection_attempts integer DEFAULT 0 NOT NULL,
+  projection_error text,
+  created_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX memory_mutation_workspace_pending_idx
+  ON memory_mutation (workspace_id, sequence)
+  WHERE projected_at IS NULL;
+
+CREATE TABLE memory_git_ref (
+  workspace_id uuid PRIMARY KEY REFERENCES workspace(id) ON DELETE CASCADE,
+  head_sha text,
+  entries jsonb DEFAULT '{}'::jsonb NOT NULL,
+  revision integer DEFAULT 0 NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
+);
+
 CREATE TABLE wiki_chunk (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   node_version_id uuid NOT NULL REFERENCES wiki_node_version(id) ON DELETE CASCADE,

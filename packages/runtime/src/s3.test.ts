@@ -13,6 +13,11 @@ describe("s3KeyFor", () => {
       "workspaces/ws1/wiki/ver1.md",
     );
   });
+  it("shards a loose Git object key by object id", () => {
+    expect(s3KeyFor.memoryGitObject("ws1", "abcdef1234")).toBe(
+      "workspaces/ws1/memory-git/objects/ab/cdef1234",
+    );
+  });
   it("builds a share html key", () => {
     expect(s3KeyFor.shareHtml("ws1", "slug1")).toBe(
       "workspaces/ws1/shares/slug1.html",

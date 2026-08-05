@@ -47,6 +47,18 @@ export async function createEvalDb(): Promise<EvalDb> {
   // structurally the same query builder over the same schema as the production
   // Neon handle; only the transport differs. `unknown` first because the two
   // drizzle-orm copies declare nominally distinct private members.
-  const db = drizzle({ client: pglite, schema, casing: "snake_case" });
-  return { db: db as unknown as Db, close: () => pglite.close() };
+  const pgliteDb = drizzle({ client: pglite, schema, casing: "snake_case" });
+  // Neon exposes `batch`, which the production memory write path uses for its
+  // atomic journal contract. The PGlite drizzle adapter does not. This eval is
+  // deliberately single-writer, so execute the already-built statements in
+  // order at this test-only transport seam. Production never uses this shim;
+  // its real `db.batch` remains one transaction.
+  const evalDb = Object.assign(pgliteDb, {
+    batch: async (statements: PromiseLike<unknown>[]) => {
+      const results: unknown[] = [];
+      for (const statement of statements) results.push(await statement);
+      return results;
+    },
+  });
+  return { db: evalDb as unknown as Db, close: () => pglite.close() };
 }

@@ -10,8 +10,12 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { and, eq, isNull } from "@acme/db";
+import { MemoryGitRef, MemoryMutation } from "@acme/db/schema";
+
 import type { FrozenEmbeddings } from "./frozen-embeddings";
 import type { EvalEnv } from "./harness";
+import { FIXTURE_NOTES } from "./fixtures/notes";
 import { FIXTURE_QUERIES } from "./fixtures/queries";
 import { frozenEmbedder } from "./frozen-embeddings";
 import { adminContext, rankedIds, readerExcept, setupEval } from "./harness";
@@ -72,6 +76,31 @@ describe("retrieval eval (PGlite + frozen embeddings)", () => {
       for (const p of q.forbidden ?? []) paths.add(p);
     }
     for (const p of paths) expect(env.idByPath.get(p), p).toBeTruthy();
+  });
+
+  it("projects every seeded mutation into one linear Git history", async () => {
+    const [pending, refs] = await Promise.all([
+      env.db
+        .select({ id: MemoryMutation.id })
+        .from(MemoryMutation)
+        .where(
+          and(
+            eq(MemoryMutation.workspaceId, env.workspaceId),
+            isNull(MemoryMutation.projectedAt),
+          ),
+        ),
+      env.db
+        .select({
+          headSha: MemoryGitRef.headSha,
+          revision: MemoryGitRef.revision,
+        })
+        .from(MemoryGitRef)
+        .where(eq(MemoryGitRef.workspaceId, env.workspaceId)),
+    ]);
+    expect(pending).toHaveLength(0);
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.revision).toBe(FIXTURE_NOTES.length);
+    expect(refs[0]?.headSha).toMatch(/^[0-9a-f]{40}$/);
   });
 
   it("meets or beats the committed recall@5 + MRR baseline", async () => {

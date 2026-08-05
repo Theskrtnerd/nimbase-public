@@ -16,6 +16,9 @@ import {
   CreateSourceSchema,
   ExternalIdentity,
   GroupMcp,
+  MemoryGitRef,
+  MemoryMutation,
+  memoryMutationChangesSchema,
   ProviderAccessObservation,
   ProviderAccessResource,
   providerAccessResourceStateSchema,
@@ -226,6 +229,50 @@ describe("wiki_node + wiki_node_version", () => {
         "created_at",
       ]),
     );
+  });
+});
+
+describe("memory mutation journal", () => {
+  it("stores durable mutations and their Git projection state separately", () => {
+    expect(
+      getTableConfig(MemoryMutation).columns.map((column) => column.name),
+    ).toEqual(
+      expect.arrayContaining([
+        "sequence",
+        "workspace_id",
+        "changes",
+        "message",
+        "git_commit_sha",
+        "projected_at",
+        "projection_attempts",
+      ]),
+    );
+    expect(
+      getTableConfig(MemoryGitRef).columns.map((column) => column.name),
+    ).toEqual(
+      expect.arrayContaining([
+        "workspace_id",
+        "head_sha",
+        "entries",
+        "revision",
+      ]),
+    );
+  });
+
+  it("validates the internal mutation wire shape", () => {
+    const changes = [
+      {
+        type: "upsert" as const,
+        path: "identity/company.md",
+        versionId: "00000000-0000-4000-8000-000000000001",
+      },
+      { type: "move" as const, from: "identity", to: "company" },
+      { type: "delete" as const, path: "archive" },
+    ];
+    expect(memoryMutationChangesSchema.parse(changes)).toEqual(changes);
+    expect(() =>
+      memoryMutationChangesSchema.parse([{ type: "upsert", path: "" }]),
+    ).toThrow();
   });
 });
 

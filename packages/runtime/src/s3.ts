@@ -48,6 +48,8 @@ export const s3KeyFor = {
     `workspaces/${workspaceId}/sources/${sourceId}/raw.md`,
   wikiBody: (workspaceId: string, versionId: string) =>
     `workspaces/${workspaceId}/wiki/${versionId}.md`,
+  memoryGitObject: (workspaceId: string, oid: string) =>
+    `workspaces/${workspaceId}/memory-git/objects/${oid.slice(0, 2)}/${oid.slice(2)}`,
   shareHtml: (workspaceId: string, slug: string) =>
     `workspaces/${workspaceId}/shares/${slug}.html`,
   artifactHtml: (workspaceId: string, id: string) =>
