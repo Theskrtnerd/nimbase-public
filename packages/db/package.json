@@ -103,12 +103,12 @@
     "@acme/prettier-config": "workspace:*",
     "@acme/tsconfig": "workspace:*",
     "@types/pg": "^8.15.5",
-    "drizzle-kit": "^0.31.5",
+    "drizzle-kit": "^0.31.10",
     "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsx": "^4.20.6",
+    "tsx": "^4.23.5",
     "typescript": "catalog:",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.10"
   },
   "prettier": "@acme/prettier-config"
 }
