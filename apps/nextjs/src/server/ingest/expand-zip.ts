@@ -79,6 +79,7 @@ export async function expandZipSource(
         ? `${container.externalId}:${entry.path}`
         : null,
       accessPolicyId: container.accessPolicyId,
+      accessResourceId: container.accessResourceId,
       metadata: { archiveSourceId: container.id, archivePath: entry.path },
     });
 

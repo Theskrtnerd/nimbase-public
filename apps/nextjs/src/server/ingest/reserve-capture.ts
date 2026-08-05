@@ -1,7 +1,7 @@
 import "server-only";
 
 import { assertWithinLimit } from "@acme/api/entitlements";
-import { and, eq } from "@acme/db";
+import { and, eq, sql } from "@acme/db";
 import { db } from "@acme/db/client";
 import { Source } from "@acme/db/schema";
 import * as s3 from "@acme/runtime/s3";
@@ -72,4 +72,30 @@ export async function findDuplicateSourceId(
     )
     .limit(1);
   return existing?.id ?? null;
+}
+
+/**
+ * Resource-level ACL mirroring no longer versions content by policy. Check the
+ * stable key first, then recognize protocol-v1 rows whose otherwise-identical
+ * key ended with a policy fingerprint. The fallback is migration-only; new
+ * rows converge on the indexed `:resource` key.
+ */
+export async function findProviderResourceDuplicateSourceId(
+  workspaceId: string,
+  baseIdempotencyKey: string,
+): Promise<string | null> {
+  const stableKey = `${baseIdempotencyKey}:resource`;
+  const exact = await findDuplicateSourceId(workspaceId, stableKey);
+  if (exact) return exact;
+  const [legacy] = await db
+    .select({ id: Source.id })
+    .from(Source)
+    .where(
+      and(
+        eq(Source.workspaceId, workspaceId),
+        sql`starts_with(${Source.idempotencyKey}, ${`${baseIdempotencyKey}:`})`,
+      ),
+    )
+    .limit(1);
+  return legacy?.id ?? null;
 }

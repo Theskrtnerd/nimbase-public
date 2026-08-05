@@ -16,6 +16,9 @@ import {
   CreateSourceSchema,
   ExternalIdentity,
   GroupMcp,
+  ProviderAccessObservation,
+  ProviderAccessResource,
+  providerAccessResourceStateSchema,
   Source,
   sourceKindSchema,
   spendKindSchema,
@@ -122,6 +125,8 @@ describe("source", () => {
         "captured_at",
         "created_at",
         "compiled_at",
+        "access_policy_id",
+        "access_resource_id",
       ]),
     );
   });
@@ -135,6 +140,57 @@ describe("source", () => {
         s3KeyRaw: "k",
       }),
     ).toThrow();
+  });
+});
+
+describe("provider access resources", () => {
+  it("stores current state separately from append-only observations", () => {
+    expect(
+      getTableConfig(ProviderAccessResource).columns.map(
+        (column) => column.name,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "connection_id",
+        "provider",
+        "kind",
+        "external_id",
+        "state",
+        "current_access_policy_id",
+        "last_verified_at",
+      ]),
+    );
+    expect(
+      getTableConfig(ProviderAccessObservation).columns.map(
+        (column) => column.name,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        "resource_id",
+        "state",
+        "access_policy_id",
+        "observed_at",
+      ]),
+    );
+  });
+
+  it("constrains lifecycle and policy-state shapes at the database boundary", () => {
+    expect(providerAccessResourceStateSchema.options).toEqual([
+      "active",
+      "inaccessible",
+      "deleted",
+    ]);
+    const checks = [ProviderAccessResource, ProviderAccessObservation].flatMap(
+      (table) => getTableConfig(table).checks.map((check) => check.name),
+    );
+    expect(checks).toEqual(
+      expect.arrayContaining([
+        "provider_access_resource_state_check",
+        "provider_access_resource_policy_state_check",
+        "provider_access_observation_state_check",
+        "provider_access_observation_policy_state_check",
+      ]),
+    );
   });
 });
 

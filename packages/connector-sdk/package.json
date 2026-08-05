@@ -1,6 +1,6 @@
 {
   "name": "@nimbase/connector-sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Wire contracts for building out-of-process Nimbase sync connectors",
   "type": "module",
   "homepage": "https://github.com/Theskrtnerd/nimbase-public/tree/main/packages/connector-sdk",

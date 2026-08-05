@@ -225,6 +225,15 @@ export type ProviderAccessGrantType = z.infer<
   typeof providerAccessGrantTypeSchema
 >;
 
+export const providerAccessResourceStateSchema = z.enum([
+  "active",
+  "inaccessible",
+  "deleted",
+]);
+export type ProviderAccessResourceState = z.infer<
+  typeof providerAccessResourceStateSchema
+>;
+
 export interface InitialGrant {
   folderId: string | null; // null = workspace root
   role: GrantRole;
@@ -404,6 +413,118 @@ export const ProviderAccessGrant = pgTable(
   ],
 );
 
+// --- provider access resources: current external ACL fence + history ---
+//
+// A resource is the provider object that owns an ACL. It is deliberately
+// separate from Source: one Slack channel or Linear team can govern many
+// immutable captures, and an ACL can change without a content revision.
+export const ProviderAccessResource = pgTable(
+  "provider_access_resource",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid("workspace_id")
+      .notNull()
+      .references(() => Workspace.id, { onDelete: "cascade" }),
+    // Null only after a connection is removed. The resource and its history
+    // survive because captured sources retain this authorization fence.
+    connectionId: t
+      .uuid("connection_id")
+      .references(() => SourceConnection.id, { onDelete: "restrict" }),
+    provider: t.text().notNull(),
+    kind: t.text().notNull(),
+    externalId: t.text("external_id").notNull(),
+    name: t.text(),
+    state: t
+      .text()
+      .notNull()
+      .$type<ProviderAccessResourceState>()
+      .default("active"),
+    currentAccessPolicyId: t
+      .uuid("current_access_policy_id")
+      .references(() => ProviderAccessPolicy.id, { onDelete: "restrict" }),
+    lastVerifiedAt: t
+      .timestamp("last_verified_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    createdAt: t
+      .timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: t
+      .timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  }),
+  (table) => [
+    uniqueIndex("provider_access_resource_connection_identity_idx").on(
+      table.connectionId,
+      table.kind,
+      table.externalId,
+    ),
+    index("provider_access_resource_workspace_idx").on(table.workspaceId),
+    index("provider_access_resource_current_policy_idx").on(
+      table.currentAccessPolicyId,
+    ),
+    check(
+      "provider_access_resource_state_check",
+      sql`${table.state} in ('active', 'inaccessible', 'deleted')`,
+    ),
+    check(
+      "provider_access_resource_policy_state_check",
+      sql`(
+        (${table.state} = 'active' AND ${table.currentAccessPolicyId} IS NOT NULL)
+        OR (${table.state} IN ('inaccessible', 'deleted') AND ${table.currentAccessPolicyId} IS NULL)
+      )`,
+    ),
+  ],
+);
+
+// Append-only lifecycle and policy transitions for one provider resource.
+// Repeated verification of the same state only advances lastVerifiedAt on the
+// resource; a new row is written when the effective state or policy changes.
+export const ProviderAccessObservation = pgTable(
+  "provider_access_observation",
+  (t) => ({
+    id: t.uuid().notNull().primaryKey().defaultRandom(),
+    workspaceId: t
+      .uuid("workspace_id")
+      .notNull()
+      .references(() => Workspace.id, { onDelete: "cascade" }),
+    resourceId: t
+      .uuid("resource_id")
+      .notNull()
+      .references(() => ProviderAccessResource.id, { onDelete: "cascade" }),
+    state: t.text().notNull().$type<ProviderAccessResourceState>(),
+    accessPolicyId: t
+      .uuid("access_policy_id")
+      .references(() => ProviderAccessPolicy.id, { onDelete: "restrict" }),
+    observedAt: t
+      .timestamp("observed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  }),
+  (table) => [
+    index("provider_access_observation_resource_observed_idx").on(
+      table.resourceId,
+      table.observedAt,
+    ),
+    index("provider_access_observation_workspace_idx").on(table.workspaceId),
+    check(
+      "provider_access_observation_state_check",
+      sql`${table.state} in ('active', 'inaccessible', 'deleted')`,
+    ),
+    check(
+      "provider_access_observation_policy_state_check",
+      sql`(
+        (${table.state} = 'active' AND ${table.accessPolicyId} IS NOT NULL)
+        OR (${table.state} IN ('inaccessible', 'deleted') AND ${table.accessPolicyId} IS NULL)
+      )`,
+    ),
+  ],
+);
+
 // --- source: raw captured input + compile job state ---
 export const Source = pgTable(
   "source",
@@ -468,12 +589,15 @@ export const Source = pgTable(
     // null for manual captures. Traceability + the continuity signal the
     // gardener uses to merge re-crawls of the same entity into one note.
     externalId: t.text("external_id"),
-    // Null for manual captures and legacy rows. Provider-managed sources must
-    // reference the immutable ACL snapshot that governed the external item at
-    // capture time.
+    // Null for manual captures and legacy rows. This immutable snapshot records
+    // what the connector observed at capture time; current authorization uses
+    // accessResourceId when present.
     accessPolicyId: t
       .uuid("access_policy_id")
       .references(() => ProviderAccessPolicy.id, { onDelete: "restrict" }),
+    accessResourceId: t
+      .uuid("access_resource_id")
+      .references(() => ProviderAccessResource.id, { onDelete: "restrict" }),
   }),
   (table) => [
     uniqueIndex("source_workspace_idempotency_key_idx").on(
@@ -482,6 +606,7 @@ export const Source = pgTable(
     ),
     index("source_connection_idx").on(table.connectionId),
     index("source_access_policy_idx").on(table.accessPolicyId),
+    index("source_access_resource_idx").on(table.accessResourceId),
   ],
 );
 
@@ -498,6 +623,7 @@ export const CreateSourceSchema = createInsertSchema(Source, {
   createdAt: true,
   compiledAt: true,
   accessPolicyId: true,
+  accessResourceId: true,
 });
 
 // --- wiki_node: the compiled KB tree (one row per node) ---

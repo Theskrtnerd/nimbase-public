@@ -64,7 +64,11 @@ export async function listSourcesForAccess(
           and(
             eq(Source.workspaceId, access.workspaceId),
             scopeFilter,
-            providerAccessFilter(access, Source.accessPolicyId),
+            providerAccessFilter(
+              access,
+              Source.accessPolicyId,
+              Source.accessResourceId,
+            ),
             keyset,
           ),
         )

@@ -1,6 +1,10 @@
 import "server-only";
 
-import type { ConnectorItem, JsonValue } from "@nimbase/connector-sdk";
+import type {
+  ConnectorAccessResource,
+  ConnectorItem,
+  JsonValue,
+} from "@nimbase/connector-sdk";
 import {
   CONNECTOR_PROTOCOL_VERSION,
   jsonValueSchema,
@@ -15,6 +19,7 @@ import { CrawlRun, SourceConnection } from "@acme/db/schema";
 
 import { decryptConnectionSecret } from "../connection-secret";
 import { ingestSource } from "../ingest/ingest-source";
+import { prepareConnectorAccess } from "./access-resources";
 import {
   nextRunAfterFailure,
   nextRunAfterSuccess,
@@ -111,9 +116,14 @@ async function pullConnection(
   if (response.items.length > maxItems) {
     throw new Error("connector returned more items than requested");
   }
+  const accessResources = response.accessResources ?? [];
+  if (accessResources.length > maxItems) {
+    throw new Error("connector returned more access resources than requested");
+  }
   return ingestItems(
     connection,
     response.items,
+    accessResources,
     response.nextCursor,
     response.hasMore,
   );
@@ -122,13 +132,21 @@ async function pullConnection(
 export async function ingestItems(
   connection: ConnectionRow,
   items: ConnectorItem[],
+  accessResources: ConnectorAccessResource[],
   cursor: JsonValue | null,
   capped: boolean,
 ): Promise<CrawlOutcome> {
+  const access = await prepareConnectorAccess({
+    workspaceId: connection.workspaceId,
+    connectionId: connection.id,
+    items,
+    accessResources,
+  });
   let ingested = 0;
   let skipped = 0;
   for (const item of items) {
     try {
+      const providerAccess = await access.resolve(item);
       const result = await ingestSource(
         {
           kind: item.kind,
@@ -145,16 +163,7 @@ export async function ingestItems(
           connectionId: connection.id,
           externalId: item.externalId,
           skipIfDuplicate: true,
-          providerAccessPolicy: item.accessPolicy
-            ? {
-                version: 1,
-                provider: connection.provider,
-                tenantId: connection.routeKey,
-                visibility: item.accessPolicy.visibility,
-                completeness: item.accessPolicy.completeness,
-                grants: item.accessPolicy.grants,
-              }
-            : undefined,
+          providerAccess,
         },
         {
           workspaceId: connection.workspaceId,

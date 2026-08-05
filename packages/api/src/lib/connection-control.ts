@@ -8,6 +8,7 @@ import { db } from "@acme/db/client";
 import { SourceConnection, WikiNode } from "@acme/db/schema";
 
 import type { AccessContext } from "./access";
+import { deleteProviderConnection } from "./provider-access";
 
 export type ConnectionControlErrorCode = "not_found" | "invalid_request";
 
@@ -214,7 +215,8 @@ export async function deleteConnection(
   connectionId: string,
 ): Promise<void> {
   await requireManageableConnection(access, connectionId);
-  await db
-    .delete(SourceConnection)
-    .where(eq(SourceConnection.id, connectionId));
+  await deleteProviderConnection({
+    workspaceId: access.workspaceId,
+    connectionId,
+  });
 }

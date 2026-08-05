@@ -52,7 +52,8 @@ beforeEach(() => {
   mocks.updateSet.mockReturnValue({ where: mocks.updateWhere });
   mocks.updateWhere.mockResolvedValue(undefined);
   mocks.persistSourceProviderAccessPolicy.mockResolvedValue({
-    id: "policy-1",
+    resourceId: "resource-1",
+    policyId: "policy-1",
     fingerprint: "policy-fingerprint",
     definition: {
       version: 1,
@@ -147,7 +148,6 @@ describe("ingestSource", () => {
     expect(result.status).toBe("held");
     expect(mocks.persistSourceProviderAccessPolicy).toHaveBeenCalledWith({
       workspaceId: "ws_1",
-      actorUserId: "user_1",
       connectionId: "connection-1",
       externalId: "thread-1",
       definition: policy,
@@ -157,6 +157,7 @@ describe("ingestSource", () => {
       expect.objectContaining({
         status: "held",
         accessPolicyId: "policy-1",
+        accessResourceId: "resource-1",
         idempotencyKey: "gmail-thread-1:policy-fingerprint",
       }),
     );
@@ -173,7 +174,8 @@ describe("ingestSource", () => {
       grants: [],
     };
     mocks.persistSourceProviderAccessPolicy.mockResolvedValueOnce({
-      id: "policy-public",
+      resourceId: "resource-public",
+      policyId: "policy-public",
       fingerprint: "public-fingerprint",
       definition: policy,
     });
@@ -194,9 +196,48 @@ describe("ingestSource", () => {
       expect.objectContaining({
         status: "held",
         accessPolicyId: "policy-public",
+        accessResourceId: "resource-public",
       }),
     );
     expect(mocks.dispatchCompile).not.toHaveBeenCalled();
+  });
+
+  it("keeps resource-linked content idempotency stable across ACL changes", async () => {
+    const providerAccess = {
+      resourceId: "resource-1",
+      policyId: "policy-1",
+      fingerprint: "policy-fingerprint",
+      definition: {
+        version: 1 as const,
+        provider: "example/issues",
+        tenantId: "tenant-1",
+        visibility: "restricted" as const,
+        completeness: "complete" as const,
+        grants: [],
+      },
+    };
+
+    const result = await ingestSource(
+      {
+        kind: "web",
+        text: "unchanged issue",
+        idempotencyKey: "example:connection:issue:revision",
+        connectionId: "connection-1",
+        externalId: "issue-1",
+        providerAccess,
+      },
+      { workspaceId: "ws_1", userId: "user_1", targetFolderId: null },
+    );
+
+    expect(result.status).toBe("held");
+    expect(mocks.persistSourceProviderAccessPolicy).not.toHaveBeenCalled();
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "example:connection:issue:revision:resource",
+        accessPolicyId: "policy-1",
+        accessResourceId: "resource-1",
+      }),
+    );
   });
 
   it("propagates a failed source insert and never dispatches", async () => {

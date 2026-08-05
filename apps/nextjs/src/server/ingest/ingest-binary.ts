@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
+import type { SourceProviderAccess } from "@acme/api/provider-access";
 import type {
   ProviderAccessPolicyDefinition,
   SourceMetadata,
@@ -13,7 +14,11 @@ import { Source } from "@acme/db/schema";
 import * as s3 from "@acme/runtime/s3";
 
 import { dispatchExtract } from "./extract-dispatch";
-import { findDuplicateSourceId, reserveCapture } from "./reserve-capture";
+import {
+  findDuplicateSourceId,
+  findProviderResourceDuplicateSourceId,
+  reserveCapture,
+} from "./reserve-capture";
 import { isZipSource } from "./zip-entries";
 
 type BinaryIngestKind = "screenshot" | "voice" | "video" | "file";
@@ -113,6 +118,7 @@ export interface BinaryBytesIngestInput extends PresignInput {
   externalId?: string | null;
   idempotencyKey?: string;
   skipIfDuplicate?: boolean;
+  providerAccess?: SourceProviderAccess;
   providerAccessPolicy?: ProviderAccessPolicyDefinition;
 }
 
@@ -230,23 +236,33 @@ export async function ingestBinaryBytes(
   if (sizeBytes <= 0 || sizeBytes > maxSizeFor({ ...input, sizeBytes })) {
     throw new BinaryIngestError("invalid_size", 400);
   }
-  const accessPolicy = input.providerAccessPolicy
-    ? await persistSourceProviderAccessPolicy({
-        workspaceId: ctx.workspaceId,
-        actorUserId: ctx.userId,
-        connectionId: input.connectionId,
-        externalId: input.externalId,
-        definition: input.providerAccessPolicy,
-      })
-    : null;
+  if (input.providerAccess && input.providerAccessPolicy) {
+    throw new Error(
+      "Provider source cannot use resolved and item-level access together",
+    );
+  }
+  const accessPolicy =
+    input.providerAccess ??
+    (input.providerAccessPolicy
+      ? await persistSourceProviderAccessPolicy({
+          workspaceId: ctx.workspaceId,
+          connectionId: input.connectionId,
+          externalId: input.externalId,
+          definition: input.providerAccessPolicy,
+        })
+      : null);
   const idempotencyKey = input.idempotencyKey
-    ? `${input.idempotencyKey}:${accessPolicy?.fingerprint ?? "manual"}`
+    ? input.providerAccess
+      ? `${input.idempotencyKey}:resource`
+      : `${input.idempotencyKey}:${accessPolicy?.fingerprint ?? "manual"}`
     : null;
   if (input.skipIfDuplicate && idempotencyKey) {
-    const existingId = await findDuplicateSourceId(
-      ctx.workspaceId,
-      idempotencyKey,
-    );
+    const existingId = input.providerAccess
+      ? await findProviderResourceDuplicateSourceId(
+          ctx.workspaceId,
+          input.idempotencyKey ?? idempotencyKey,
+        )
+      : await findDuplicateSourceId(ctx.workspaceId, idempotencyKey);
     if (existingId) return { sourceId: existingId, status: "skipped" };
   }
 
@@ -278,7 +294,8 @@ export async function ingestBinaryBytes(
       targetFolderId: ctx.targetFolderId,
       connectionId: input.connectionId ?? null,
       externalId: input.externalId ?? null,
-      accessPolicyId: accessPolicy?.id ?? null,
+      accessPolicyId: accessPolicy?.policyId ?? null,
+      accessResourceId: accessPolicy?.resourceId ?? null,
     })
     .onConflictDoNothing({
       target: [Source.workspaceId, Source.idempotencyKey],

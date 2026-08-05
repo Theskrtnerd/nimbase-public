@@ -11,6 +11,7 @@ import {
   ProviderAccessGrant,
   ProviderAccessPolicy,
   providerAccessPolicyDefinitionSchema,
+  ProviderAccessResource,
   UserProfile,
   UserProfileEmail,
 } from "./schema";
@@ -233,5 +234,34 @@ export function providerResourceAccessSql(
   return sql`(
     ${policyId} is null
     OR ${providerPolicyAccessSql(policyId, subject)}
+  )`;
+}
+
+/**
+ * SQL authorization for an immutable Source capture. Linked provider evidence
+ * follows its resource's current policy and lifecycle; unlinked legacy/manual
+ * evidence keeps the capture policy behavior used before resource mirroring.
+ */
+export function providerSourceAccessSql(
+  capturePolicyId: SQL | SQLWrapper,
+  resourceId: SQL | SQLWrapper,
+  subject: ProviderAccessSubject,
+): SQL {
+  return sql`(
+    (
+      ${resourceId} is null
+      AND ${providerResourceAccessSql(capturePolicyId, subject)}
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM ${ProviderAccessResource} access_resource
+      WHERE access_resource.id = ${resourceId}
+        AND access_resource.workspace_id = ${subject.workspaceId}
+        AND access_resource.state = 'active'
+        AND ${providerPolicyAccessSql(
+          sql`access_resource.current_access_policy_id`,
+          subject,
+        )}
+    )
   )`;
 }

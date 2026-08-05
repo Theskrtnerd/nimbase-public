@@ -36,6 +36,89 @@ describe("connector wire contracts", () => {
     ).toThrow();
   });
 
+  it("accepts ACL-resource observations without content changes", () => {
+    expect(
+      connectorPullResponseSchema.parse({
+        protocolVersion: 1,
+        items: [],
+        accessResources: [
+          {
+            kind: "channel",
+            externalId: "C123",
+            name: "engineering",
+            state: "active",
+            accessPolicy: {
+              visibility: "restricted",
+              completeness: "complete",
+              grants: [{ type: "email", email: "ada@example.com" }],
+            },
+          },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      }).accessResources,
+    ).toHaveLength(1);
+  });
+
+  it("requires a policy only for active ACL resources", () => {
+    expect(() =>
+      connectorPullResponseSchema.parse({
+        protocolVersion: 1,
+        items: [],
+        accessResources: [
+          { kind: "channel", externalId: "C123", state: "active" },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    ).toThrow();
+    expect(() =>
+      connectorPullResponseSchema.parse({
+        protocolVersion: 1,
+        items: [],
+        accessResources: [
+          {
+            kind: "channel",
+            externalId: "C123",
+            state: "deleted",
+            accessPolicy: {
+              visibility: "workspace",
+              completeness: "complete",
+              grants: [],
+            },
+          },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    ).toThrow();
+  });
+
+  it("rejects ambiguous item-level and resource-level policies", () => {
+    expect(() =>
+      connectorPullResponseSchema.parse({
+        protocolVersion: 1,
+        items: [
+          {
+            externalId: "THREAD-1",
+            title: "Thread",
+            markdown: "# Thread",
+            updatedAt: "2026-08-06T00:00:00.000Z",
+            contentHash: "revision-1",
+            accessResource: { kind: "channel", externalId: "C123" },
+            accessPolicy: {
+              visibility: "workspace",
+              completeness: "complete",
+              grants: [],
+            },
+          },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      }),
+    ).toThrow();
+  });
+
   it("serves a connector through the Fetch-compatible handler", async () => {
     const handler = createConnectorHandler({
       manifest: {
