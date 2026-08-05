@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { processExtractJob } from "./extract";
+import {
+  registerRichDocumentExtractor,
+  resetRichDocumentExtractorForTesting,
+} from "./rich-document-extractor";
 
 const mocks = vi.hoisted(() => ({
   selectLimit: vi.fn(),
@@ -71,6 +75,7 @@ const BASE_SOURCE = {
 };
 
 beforeEach(() => {
+  resetRichDocumentExtractorForTesting();
   mocks.updateSet.mockReturnValue({
     where: vi.fn().mockResolvedValue(undefined),
   });
@@ -107,7 +112,10 @@ const ZIP_SOURCE = {
   originalFilename: "wiki-export.zip",
 };
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  resetRichDocumentExtractorForTesting();
+  vi.clearAllMocks();
+});
 
 const JOB = { jobId: "extract_1", workspaceId: "ws_1", sourceId: "src_1" };
 
@@ -189,6 +197,43 @@ describe("processExtractJob", () => {
       expect.objectContaining({ kind: "extract" }),
     );
     expect(mocks.dispatchCompile).toHaveBeenCalled();
+  });
+
+  it("delegates a rich document to a registered distribution adapter", async () => {
+    const extract = vi.fn(() =>
+      Promise.resolve({
+        markdown: "# Parsed handbook",
+        extractedBy: "hosted-parser:document",
+      }),
+    );
+    registerRichDocumentExtractor({
+      supports: (mimeType) => mimeType === "application/pdf",
+      extract,
+    });
+    mocks.selectLimit.mockResolvedValue([
+      {
+        ...BASE_SOURCE,
+        kind: "file",
+        mimeType: "application/pdf",
+        originalFilename: "Handbook.PDF",
+      },
+    ]);
+
+    await processExtractJob(JOB);
+
+    expect(extract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mimeType: "application/pdf",
+        extension: "pdf",
+      }),
+    );
+    expect(mocks.buildRawMd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: "# Parsed handbook",
+        metadata: { extractedBy: "hosted-parser:document" },
+      }),
+    );
+    expect(mocks.extractBinaryText).not.toHaveBeenCalled();
   });
 
   it("is idempotent — a retry after raw.md landed is a no-op", async () => {

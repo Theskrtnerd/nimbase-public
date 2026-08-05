@@ -137,6 +137,11 @@ serves sandboxed HTML and can attach that HTML directly; a distribution may
 provide its own isolated PNG/PDF renderer without placing browser-execution
 code in the Community runtime.
 
+Hosted distributions can register a `RichDocumentExtractor` during server
+startup for PDF, Office, image, or other vendor-backed parsing. With no adapter
+registered, Community keeps the original bytes and emits a metadata-only note
+instead of sending content to a third party.
+
 Connector endpoints must use public HTTPS by default. If an installation
 deliberately runs connectors on a private network, set
 `NIMBASE_ALLOW_PRIVATE_CONNECTORS=true`; this relaxes the private-address and

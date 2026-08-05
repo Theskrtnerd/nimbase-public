@@ -14,6 +14,7 @@ import * as s3 from "@acme/runtime/s3";
 
 import { dispatchCompile } from "~/server/compile/dispatch";
 import { expandZipSource } from "./expand-zip";
+import { getRichDocumentExtractor } from "./rich-document-extractor";
 import { buildArchiveManifest, isZipSource } from "./zip-entries";
 
 // "file" sources in this text-native mime set decode straight to raw.md — no
@@ -35,6 +36,37 @@ const DEFAULT_MIME_FOR_KIND: Record<"screenshot" | "voice" | "video", string> =
 
 function noExtractionStub(mimeType: string | null): string {
   return `_No text extraction available for this file type (${mimeType ?? "unknown mime"}) yet — the original is stored and downloadable._`;
+}
+
+async function extractRichDocument(
+  source: typeof Source.$inferSelect,
+  bytes: Uint8Array,
+): Promise<{ body: string; extractedBy?: string } | null> {
+  const extractor = getRichDocumentExtractor();
+  if (!extractor?.supports(source.mimeType)) return null;
+
+  try {
+    const result = await extractor.extract({
+      data: bytes,
+      mimeType: source.mimeType ?? "application/octet-stream",
+      extension: extensionOf(source.originalFilename),
+    });
+    if (result.markdown.trim().length === 0) {
+      return { body: noExtractionStub(source.mimeType) };
+    }
+    return { body: result.markdown, extractedBy: result.extractedBy };
+  } catch (error) {
+    console.error("[extract] rich document extraction failed", {
+      sourceId: source.id,
+      mimeType: source.mimeType,
+      error,
+    });
+    return { body: noExtractionStub(source.mimeType) };
+  }
+}
+
+function extensionOf(filename: string | null): string | undefined {
+  return /\.([a-z0-9]+)$/i.exec(filename ?? "")?.[1]?.toLowerCase();
 }
 
 /**
@@ -136,39 +168,50 @@ export async function processExtractJob(
 
     let body: string;
     let extractionModelId: string | undefined;
+    let extractedBy: string | undefined;
     if (
       source.kind === "file" &&
       source.mimeType &&
       TEXT_NATIVE_MIME.has(source.mimeType)
     ) {
       body = Buffer.from(bytes).toString("utf8");
-    } else if (
-      source.kind === "screenshot" ||
-      source.kind === "voice" ||
-      source.kind === "video"
-    ) {
-      const extracted = await extractBinaryText({
-        kind: source.kind,
-        mimeType: source.mimeType ?? DEFAULT_MIME_FOR_KIND[source.kind],
-        data: bytes,
-        workspaceId,
-      });
-      body = extracted.markdown;
-      extractionModelId = extracted.modelId;
-      const cents = costFor(extracted.modelId, extracted.usage);
-      if (cents > 0) {
-        await db
-          .insert(SpendLedger)
-          .values({ workspaceId, kind: "extract", cents, jobId: null });
-      }
     } else {
-      // A file with no Community extraction path remains a valid capture: keep
-      // its original plus metadata-only raw.md rather than failing the source.
-      body = noExtractionStub(source.mimeType);
+      const richDocument =
+        source.kind === "file" || source.kind === "screenshot"
+          ? await extractRichDocument(source, bytes)
+          : null;
+      if (richDocument) {
+        body = richDocument.body;
+        extractedBy = richDocument.extractedBy;
+      } else if (
+        source.kind === "screenshot" ||
+        source.kind === "voice" ||
+        source.kind === "video"
+      ) {
+        const extracted = await extractBinaryText({
+          kind: source.kind,
+          mimeType: source.mimeType ?? DEFAULT_MIME_FOR_KIND[source.kind],
+          data: bytes,
+          workspaceId,
+        });
+        body = extracted.markdown;
+        extractionModelId = extracted.modelId;
+        const cents = costFor(extracted.modelId, extracted.usage);
+        if (cents > 0) {
+          await db
+            .insert(SpendLedger)
+            .values({ workspaceId, kind: "extract", cents, jobId: null });
+        }
+      } else {
+        // A file with no Community extraction path remains a valid capture:
+        // keep its original plus metadata-only raw.md rather than failing.
+        body = noExtractionStub(source.mimeType);
+      }
     }
 
     const provenance = {
       ...(extractionModelId ? { extractionModelId } : {}),
+      ...(extractedBy ? { extractedBy } : {}),
     };
     const metadata =
       Object.keys(provenance).length > 0
