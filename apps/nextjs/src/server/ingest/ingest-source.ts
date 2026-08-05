@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { clerkClient } from "@clerk/nextjs/server";
 
+import type { SourceProviderAccess } from "@acme/api/provider-access";
 import type {
   ProviderAccessPolicyDefinition,
   SourceMetadata,
@@ -16,7 +17,11 @@ import { buildRawMd } from "@acme/runtime/raw-md";
 import * as s3 from "@acme/runtime/s3";
 
 import { dispatchCompile } from "~/server/compile/dispatch";
-import { findDuplicateSourceId, reserveCapture } from "./reserve-capture";
+import {
+  findDuplicateSourceId,
+  findProviderResourceDuplicateSourceId,
+  reserveCapture,
+} from "./reserve-capture";
 
 export interface IngestInput {
   kind: "web" | "chat_export" | "highlight" | "file";
@@ -29,7 +34,10 @@ export interface IngestInput {
   // Scheduled-crawl provenance (null/absent for a manual capture).
   connectionId?: string | null;
   externalId?: string | null;
-  // Required for provider-managed sources. Manual capture leaves this absent.
+  // The crawl runtime resolves resource-level observations before ingestion.
+  providerAccess?: SourceProviderAccess;
+  // Protocol-v1 compatibility: item-level policies are mirrored to an
+  // item-scoped resource during ingestion.
   providerAccessPolicy?: ProviderAccessPolicyDefinition;
   // When true, a unique (workspaceId, idempotencyKey) collision is a no-op
   // "skip" instead of an error. The crawl re-ingest path relies on this: an
@@ -88,19 +96,28 @@ export async function ingestSource(
   const bodyBytes = Buffer.byteLength(originalBody);
   const contentHash = createHash("sha256").update(originalBody).digest("hex");
   const capturedAt = input.capturedAt ? new Date(input.capturedAt) : null;
-  const accessPolicy = input.providerAccessPolicy
-    ? await persistSourceProviderAccessPolicy({
-        workspaceId,
-        actorUserId: userId,
-        connectionId: input.connectionId,
-        externalId: input.externalId,
-        definition: input.providerAccessPolicy,
-      })
-    : null;
-  // The same provider item under a changed ACL must create a new immutable
-  // evidence row even when its body is unchanged.
+  if (input.providerAccess && input.providerAccessPolicy) {
+    throw new Error(
+      "Provider source cannot use resolved and item-level access together",
+    );
+  }
+  const accessPolicy =
+    input.providerAccess ??
+    (input.providerAccessPolicy
+      ? await persistSourceProviderAccessPolicy({
+          workspaceId,
+          connectionId: input.connectionId,
+          externalId: input.externalId,
+          definition: input.providerAccessPolicy,
+        })
+      : null);
+  // Resource-level ACL transitions have their own governance history and must
+  // not duplicate unchanged source bytes. The fingerprint suffix remains only
+  // for protocol-v1 item policies that cannot report ACL-only observations.
   const idempotencyKey = input.idempotencyKey
-    ? `${input.idempotencyKey}:${accessPolicy?.fingerprint ?? "manual"}`
+    ? input.providerAccess
+      ? `${input.idempotencyKey}:resource`
+      : `${input.idempotencyKey}:${accessPolicy?.fingerprint ?? "manual"}`
     : null;
 
   // Crawl re-ingest dedup: a cheap indexed lookup up front so an unchanged item
@@ -109,7 +126,12 @@ export async function ingestSource(
   // key embeds the connectionId, so nothing else races this key; the insert
   // below still uses onConflictDoNothing as the authoritative guard.
   if (input.skipIfDuplicate && idempotencyKey) {
-    const existingId = await findDuplicateSourceId(workspaceId, idempotencyKey);
+    const existingId = input.providerAccess
+      ? await findProviderResourceDuplicateSourceId(
+          workspaceId,
+          input.idempotencyKey ?? idempotencyKey,
+        )
+      : await findDuplicateSourceId(workspaceId, idempotencyKey);
     if (existingId) return { sourceId: existingId, status: "skipped" };
   }
 
@@ -154,7 +176,8 @@ export async function ingestSource(
     targetFolderId,
     connectionId: input.connectionId ?? null,
     externalId: input.externalId ?? null,
-    accessPolicyId: accessPolicy?.id ?? null,
+    accessPolicyId: accessPolicy?.policyId ?? null,
+    accessResourceId: accessPolicy?.resourceId ?? null,
   };
 
   if (input.skipIfDuplicate) {

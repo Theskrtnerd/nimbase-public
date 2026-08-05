@@ -50,7 +50,11 @@ export async function workspaceStatus(access: AccessContext) {
           and(
             eq(Source.workspaceId, access.workspaceId),
             scopeFilter,
-            providerAccessFilter(access, Source.accessPolicyId),
+            providerAccessFilter(
+              access,
+              Source.accessPolicyId,
+              Source.accessResourceId,
+            ),
           ),
         )
         .groupBy(Source.status),

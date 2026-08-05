@@ -52,7 +52,11 @@ export async function GET(
         eq(Source.id, id),
         eq(Source.workspaceId, authorized.workspaceId),
         scopeFilter,
-        providerAccessFilter(authorized.access, Source.accessPolicyId),
+        providerAccessFilter(
+          authorized.access,
+          Source.accessPolicyId,
+          Source.accessResourceId,
+        ),
       ),
     )
     .limit(1);

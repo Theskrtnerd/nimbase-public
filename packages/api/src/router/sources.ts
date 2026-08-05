@@ -42,7 +42,11 @@ export const sourcesRouter = {
         and(
           eq(Source.workspaceId, input.workspaceId),
           scopeFilter,
-          providerAccessFilter(ctx.access, Source.accessPolicyId),
+          providerAccessFilter(
+            ctx.access,
+            Source.accessPolicyId,
+            Source.accessResourceId,
+          ),
         ),
       )
       .orderBy(desc(Source.createdAt))

@@ -7,6 +7,7 @@ import {
   fingerprintProviderAccessPolicy,
   providerPolicyAccessSql,
   providerResourceAccessSql,
+  providerSourceAccessSql,
 } from "./provider-access";
 
 const dialect = new PgDialect();
@@ -77,5 +78,21 @@ describe("provider access policies", () => {
     );
     expect(nullable.sql).toContain("is null");
     expect(nullable.sql).toContain("policy.visibility = 'workspace'");
+  });
+
+  it("authorizes linked sources through the resource current policy", () => {
+    const query = dialect.sqlToQuery(
+      providerSourceAccessSql(
+        sql`source.access_policy_id`,
+        sql`source.access_resource_id`,
+        { workspaceId: "workspace-1", userProfileId: "profile-1" },
+      ),
+    );
+
+    expect(query.sql).toContain("provider_access_resource");
+    expect(query.sql).toContain("access_resource.state = 'active'");
+    expect(query.sql).toContain("access_resource.current_access_policy_id");
+    expect(query.sql).toContain("source.access_resource_id is null");
+    expect(query.sql).toContain("source.access_policy_id");
   });
 });

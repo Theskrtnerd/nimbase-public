@@ -3,6 +3,11 @@
 - Status: accepted
 - Date: 2026-08-01
 
+The mutable source re-fencing mechanism in this decision is superseded by
+[ADR 0002](0002-provider-access-resource-mirroring.md). Immutable policies,
+dynamic identity resolution, fail-closed SQL filtering, and held-source rules
+remain accepted.
+
 ## Context
 
 Nimbase captures company sources whose provider permissions differ. Compiling

@@ -63,17 +63,63 @@ export const connectorAccessPolicySchema = z.object({
 });
 export type ConnectorAccessPolicy = z.infer<typeof connectorAccessPolicySchema>;
 
-export const connectorItemSchema = z.object({
+const connectorAccessResourceIdentityShape = {
+  kind: z.string().min(1).max(128),
   externalId: z.string().min(1).max(1_000),
-  title: z.string().min(1).max(2_000),
-  markdown: z.string().max(10_000_000),
-  sourceUrl: z.url().optional(),
-  updatedAt: z.iso.datetime(),
-  contentHash: z.string().min(1).max(256),
-  kind: z.enum(["web", "chat_export"]).default("web"),
-  metadata: z.record(z.string(), jsonValueSchema).optional(),
-  accessPolicy: connectorAccessPolicySchema.optional(),
+  name: z.string().min(1).max(2_000).optional(),
+};
+
+export const connectorAccessResourceRefSchema = z.object({
+  kind: connectorAccessResourceIdentityShape.kind,
+  externalId: connectorAccessResourceIdentityShape.externalId,
 });
+export type ConnectorAccessResourceRef = z.infer<
+  typeof connectorAccessResourceRefSchema
+>;
+
+export const connectorAccessResourceSchema = z.discriminatedUnion("state", [
+  z
+    .object({
+      ...connectorAccessResourceIdentityShape,
+      state: z.literal("active"),
+      accessPolicy: connectorAccessPolicySchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...connectorAccessResourceIdentityShape,
+      state: z.literal("inaccessible"),
+    })
+    .strict(),
+  z
+    .object({
+      ...connectorAccessResourceIdentityShape,
+      state: z.literal("deleted"),
+    })
+    .strict(),
+]);
+export type ConnectorAccessResource = z.infer<
+  typeof connectorAccessResourceSchema
+>;
+
+export const connectorItemSchema = z
+  .object({
+    externalId: z.string().min(1).max(1_000),
+    title: z.string().min(1).max(2_000),
+    markdown: z.string().max(10_000_000),
+    sourceUrl: z.url().optional(),
+    updatedAt: z.iso.datetime(),
+    contentHash: z.string().min(1).max(256),
+    kind: z.enum(["web", "chat_export"]).default("web"),
+    metadata: z.record(z.string(), jsonValueSchema).optional(),
+    accessResource: connectorAccessResourceRefSchema.optional(),
+    // Compatibility for protocol-v1 connectors. New connectors should emit a
+    // resource observation and reference it with `accessResource` instead.
+    accessPolicy: connectorAccessPolicySchema.optional(),
+  })
+  .refine((item) => !(item.accessResource && item.accessPolicy), {
+    message: "an item cannot contain both accessResource and accessPolicy",
+  });
 export type ConnectorItem = z.infer<typeof connectorItemSchema>;
 
 export const connectorPullRequestSchema = z.object({
@@ -88,6 +134,7 @@ export type ConnectorPullRequest = z.infer<typeof connectorPullRequestSchema>;
 export const connectorPullResponseSchema = z.object({
   protocolVersion: z.literal(CONNECTOR_PROTOCOL_VERSION),
   items: z.array(connectorItemSchema).max(2_000),
+  accessResources: z.array(connectorAccessResourceSchema).max(2_000).optional(),
   nextCursor: jsonValueSchema.nullable(),
   hasMore: z.boolean(),
 });

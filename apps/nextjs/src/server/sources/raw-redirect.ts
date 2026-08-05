@@ -70,7 +70,11 @@ export async function redirectToSourceArtifact(
     .where(
       and(
         eq(Source.id, id),
-        providerAccessFilter(authorized.access, Source.accessPolicyId),
+        providerAccessFilter(
+          authorized.access,
+          Source.accessPolicyId,
+          Source.accessResourceId,
+        ),
       ),
     )
     .limit(1);

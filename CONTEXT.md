@@ -10,12 +10,21 @@ decisions; historical plans do not override it.
 - **UserProfile** — the stable employee identity inside a workspace. A Clerk
   account, verified email aliases, and provider subjects resolve to it.
 - **Source** — immutable captured evidence: the exact original plus normalized
-  `raw.md`, provenance, and (for connector content) an access-policy snapshot.
+  `raw.md`, provenance, and (for connector content) the access-policy snapshot
+  observed when it was captured.
 - **ProviderAccessPolicy** — immutable, content-addressed ACL snapshot copied
-  from a provider when a source is captured. It is evaluated against current
-  `UserProfileEmail` and `ExternalIdentity` bindings.
-- **Access domain** — sources with the same provider-policy fingerprint. It is
-  a security fence, not a manually authored presentation or reader model.
+  from a provider. It is evaluated against current `UserProfileEmail` and
+  `ExternalIdentity` bindings.
+- **ProviderAccessResource** — the stable provider object whose current ACL
+  governs one or more sources, such as a Drive file, Slack channel, Linear
+  team, mail thread, or code repository. Its identity is scoped to one
+  connection.
+- **ProviderAccessObservation** — append-only evidence that a connector
+  observed a new effective policy or lifecycle state for a
+  `ProviderAccessResource`. Reverification of the same state advances resource
+  freshness without duplicating history.
+- **Access domain** — sources governed by the same current provider policy. It
+  is a security fence, not a manually authored presentation or reader model.
 - **Memory** — durable OKF markdown compiled from sources. Object storage is
   authoritative; Postgres is its derived retrieval index.
 - **Held source** — provider evidence retained for authorized raw access but
@@ -33,8 +42,9 @@ decisions; historical plans do not override it.
 2. Provider ACLs are applied before returning source metadata, raw evidence, or
    retrieval candidates. Workspace admins do not bypass restricted grants.
 3. Unknown, partial, or missing provider identity data fails closed.
-4. Policy changes re-fence existing source history and create new evidence even
-   if content did not change.
+4. Source capture history is immutable. A policy-only change appends a provider
+   access observation and changes the resource's current authorization fence;
+   it does not rewrite captures or duplicate unchanged source bytes.
 5. Derived memory may combine sources only when its compiler and evals can
    prove the resulting policy across later ACL changes. Until then, every
    provider source remains held.
