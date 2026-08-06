@@ -4,6 +4,7 @@ import { runCrawlJob } from "~/server/crawl/run";
 import { verifyQstashSignature } from "~/server/qstash";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 // The publisher's schema, not a local mirror — a mirror that drops a field
 // strips it silently on parse.
