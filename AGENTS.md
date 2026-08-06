@@ -12,6 +12,10 @@ Capture → Compile → Share. This is a pnpm/Turborepo monorepo.
 4. `packages/connector-sdk/`: provider-neutral wire contracts for independent
    out-of-process connectors.
 
+The dashboard and web onboarding are archived. Do not add product workflows
+there; add complete CLI commands and the server contracts they need. Browser
+pages are reserved for authentication, provider consent, and public shares.
+
 ## Core invariants
 
 - All workspace and folder access goes through the shared access-resolution

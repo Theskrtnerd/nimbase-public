@@ -104,11 +104,20 @@ Community server without Nimbase's private secret manager wrapper:
 pnpm dev:community
 ```
 
-Open `http://localhost:3100`. The published CLI can target the installation:
+Keep the Community server running, then install the published CLI and point it
+at that installation. The browser opens only for the authentication step:
 
 ```sh
+npm install --global nimbase
 NIMBASE_API_URL=http://localhost:3100 nimbase auth login
+NIMBASE_API_URL=http://localhost:3100 nimbase workspace create \
+  --title "Acme" \
+  --description "Company memory for Acme"
 ```
+
+The server root shows a CLI handoff page. The former dashboard and web
+onboarding routes are archived and redirect there; workspace creation,
+capture, sync, memory, and deployment operations are CLI workflows.
 
 ## What Community exposes
 

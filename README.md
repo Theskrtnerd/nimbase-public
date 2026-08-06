@@ -95,11 +95,13 @@ nimbase deploy mcp create "Engineering" --folder engineering
 Every command takes `--json` for scripting and agent use, and `--workspace <slug>` to
 override the default. See the [CLI reference](./apps/cli/README.md) for the full surface.
 
-The self-hosted web app handles login and the flows the CLI cannot reasonably
-provide. See [Building a connector](./docs/connectors.md) for the versioned
-protocol and SDK. Some Apache-licensed CLI commands also target optional
-Nimbase Cloud surfaces; the [self-hosting guide](./docs/self-hosting.md) lists
-the exact Community boundary.
+The browser is used only when a CLI flow requires interactive authentication.
+The former dashboard and web onboarding are archived while the underlying
+systems mature. See [Building a connector](./docs/connectors.md) for the
+versioned protocol and SDK. Some Apache-licensed CLI commands also target
+optional Nimbase Cloud surfaces; the
+[self-hosting guide](./docs/self-hosting.md) lists the exact Community
+boundary.
 
 ## Status
 
@@ -121,7 +123,7 @@ Turborepo + pnpm monorepo.
 ```
 apps/
 ├─ cli/               nimbase CLI — the primary control plane (commander + tsup)
-└─ nextjs/            REST + tRPC API, workers, MCP transport, auth, shares
+└─ nextjs/            REST API, workers, MCP transport, auth, widgets, shares
 
 packages/
 ├─ connector-sdk/ Apache-licensed contracts and connector handler
@@ -134,8 +136,9 @@ packages/
 └─ mdx/           MDX processing
 ```
 
-Deeper reading: [memory kernel architecture](./docs/architecture/memory-kernel.md) ·
-[design system](./DESIGN.md) · [agent conventions](./CLAUDE.md).
+Deeper reading: [CLI-first interface](./docs/architecture/cli-first-interface.md) ·
+[memory kernel architecture](./docs/architecture/memory-kernel.md) ·
+[agent conventions](./CLAUDE.md).
 
 ### Run from source
 
@@ -177,7 +180,7 @@ See [the public roadmap](https://nimbase.ai/roadmap) for the live version.
 
 Nimbase uses a deliberately split open-source model:
 
-- The server, memory engine, capture/compile system, web application, workers,
+- The server, memory engine, capture/compile system, archived web UI, workers,
   and other core packages are licensed under
   [AGPL-3.0-only](./LICENSE). If users interact with a modified version over a
   network, the AGPL requires offering them the corresponding source.

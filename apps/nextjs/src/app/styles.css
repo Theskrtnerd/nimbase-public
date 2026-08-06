@@ -72,8 +72,7 @@
 }
 
 /*
- * Cosmic surface — the "home-cosmos" star-map / atmosphere treatment shared by
- * the auth pages and the post-login dashboard home.
+ * Cosmic surface shared by the auth pages and the CLI-first handoff.
  */
 .cosmos-star-map {
   background-image:
@@ -140,9 +139,7 @@
 
 /*
  * WCAG 2.3.3 — honor the OS "reduce motion" setting for CSS-driven animation
- * and transitions. JS-driven `motion/react` animations are handled separately
- * by <MotionProvider> (MotionConfig reducedMotion="user") in layout.tsx, since
- * CSS cannot reach those.
+ * and transitions.
  */
 @media (prefers-reduced-motion: reduce) {
   *,

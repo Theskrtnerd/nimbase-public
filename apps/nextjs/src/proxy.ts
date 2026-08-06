@@ -6,7 +6,7 @@ import { env } from "~/env";
 // Inverse model: only routes matched here require a Clerk session. Everything
 // else (including signed QStash jobs and public pages) stays public and
 // self-authorizes in its handler.
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)", "/desktop(.*)"]);
+const isProtectedRoute = createRouteMatcher(["/desktop(.*)"]);
 
 // Map mcp.<appHost>/<org>/<group>/mcp → /api/group-mcp/<org>/<group>. Returns
 // null when the host isn't the dedicated MCP subdomain or the path isn't a group
