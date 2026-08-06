@@ -8,6 +8,7 @@ import { Button } from "@acme/ui/button";
 
 import { formatDateTime } from "~/lib/format-date";
 import { useTRPC } from "~/trpc/react";
+import { firstSyncPollInterval } from "./connection-polling";
 import { StatusPill } from "./table-primitives";
 
 type Connection = RouterOutputs["connections"]["list"][number];
@@ -25,7 +26,12 @@ export function IntegrationsSettings({ workspaceId }: { workspaceId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const connections = useQuery(
-    trpc.connections.list.queryOptions({ workspaceId }),
+    trpc.connections.list.queryOptions(
+      { workspaceId },
+      {
+        refetchInterval: (query) => firstSyncPollInterval(query.state.data),
+      },
+    ),
   );
   const invalidate = async () => {
     await queryClient.invalidateQueries(
