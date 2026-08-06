@@ -17,8 +17,9 @@ and MCP commands. `workspace plan`, `deploy docs`, and the first-party Slack
 interface target optional Nimbase Cloud server adapters and are not installed
 by the Community runtime.
 
-The dashboard and web onboarding are currently archived. Browser windows are
-used only for authentication and provider consent initiated by CLI commands.
+The first-party Nimbase web UI is disabled. Browser windows are used only for
+hosted identity-provider and provider-consent screens; control returns directly
+to the CLI.
 
 ## Install
 

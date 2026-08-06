@@ -15,6 +15,7 @@ export const env = createEnv({
    */
   server: {
     CLERK_SECRET_KEY: z.string().min(1),
+    CLERK_ACCOUNT_PORTAL_URL: z.url().default("https://accounts.nimbase.ai"),
     POSTGRES_URL: z.url(),
     DESKTOP_AUTH_SECRET: z.string().min(32),
     NIMBASE_WEB_URL: z.url().default("http://localhost:3100"),

@@ -24,7 +24,9 @@ export default defineConfig({
     // `dev` script injects env via `infisical run --env dev`, so a fresh
     // machine needs `infisical login` first.
     command: "pnpm dev",
-    url: baseURL,
+    // The product root intentionally returns 410 while the UI is disabled, so
+    // use a stable machine endpoint for Playwright's readiness probe.
+    url: `${baseURL}/.well-known/oauth-authorization-server`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

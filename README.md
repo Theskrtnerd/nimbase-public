@@ -95,9 +95,9 @@ nimbase deploy mcp create "Engineering" --folder engineering
 Every command takes `--json` for scripting and agent use, and `--workspace <slug>` to
 override the default. See the [CLI reference](./apps/cli/README.md) for the full surface.
 
-The browser is used only when a CLI flow requires interactive authentication.
-The former dashboard and web onboarding are archived while the underlying
-systems mature. See [Building a connector](./docs/connectors.md) for the
+The first-party product UI is disabled. When a CLI flow requires identity or
+provider consent, the browser is sent to the hosted third-party screen and
+returns directly to the CLI. See [Building a connector](./docs/connectors.md) for the
 versioned protocol and SDK. Some Apache-licensed CLI commands also target
 optional Nimbase Cloud surfaces; the
 [self-hosting guide](./docs/self-hosting.md) lists the exact Community

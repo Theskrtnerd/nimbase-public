@@ -8,6 +8,44 @@ import { env } from "~/env";
 // self-authorizes in its handler.
 const isProtectedRoute = createRouteMatcher(["/desktop(.*)"]);
 
+const disabledProductUiPrefixes = [
+  "/dashboard",
+  "/onboarding",
+  "/login",
+  "/sign-up",
+  "/admin",
+] as const;
+
+export function isDisabledProductUi(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    disabledProductUiPrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+  );
+}
+
+export function accountPortalSignInUrl(
+  portalUrl: string,
+  returnUrl: string,
+): URL {
+  const base = portalUrl.endsWith("/") ? portalUrl : `${portalUrl}/`;
+  const signIn = new URL("sign-in", base);
+  signIn.searchParams.set("redirect_url", returnUrl);
+  return signIn;
+}
+
+function disabledProductUiResponse(): Response {
+  return new Response("Nimbase web UI is disabled. Use the nimbase CLI.\n", {
+    status: 410,
+    headers: {
+      "cache-control": "no-store",
+      "content-type": "text/plain; charset=utf-8",
+      "x-robots-tag": "noindex, nofollow",
+    },
+  });
+}
+
 // Map mcp.<appHost>/<org>/<group>/mcp → /api/group-mcp/<org>/<group>. Returns
 // null when the host isn't the dedicated MCP subdomain or the path isn't a group
 // MCP URL. A single fixed subdomain (not a wildcard) keeps DNS/TLS simple — one
@@ -41,8 +79,20 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.rewrite(url);
   }
 
+  if (isDisabledProductUi(req.nextUrl.pathname)) {
+    return disabledProductUiResponse();
+  }
+
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.redirect(
+        accountPortalSignInUrl(
+          env.CLERK_ACCOUNT_PORTAL_URL,
+          req.nextUrl.toString(),
+        ),
+      );
+    }
   }
 });
 
