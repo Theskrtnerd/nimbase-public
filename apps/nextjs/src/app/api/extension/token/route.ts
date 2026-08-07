@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 
 import { issueSessionToken, redeemAuthCode } from "~/lib/desktop-auth";
+import { acceptPendingInvites } from "~/server/auth/accept-invites";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
 
   const client = await clerkClient();
   const user = await client.users.getUser(redeemed.userId);
+  await acceptPendingInvites(user);
   const session = issueSessionToken(redeemed.userId);
 
   return NextResponse.json({

@@ -97,18 +97,30 @@ docker compose exec -T postgres psql -U nimbase -d nimbase \
   < packages/db/sql/0002_hybrid_search.sql
 ```
 
-Configure the Clerk application for `http://localhost:3100`, then start the
-Community server without Nimbase's private secret manager wrapper:
+Configure the Clerk application for `http://localhost:3100` and set
+`CLERK_ACCOUNT_PORTAL_URL` to that instance's hosted Account Portal origin.
+Then start the Community server without Nimbase's private secret manager
+wrapper:
 
 ```sh
 pnpm dev:community
 ```
 
-Open `http://localhost:3100`. The published CLI can target the installation:
+Keep the Community server running, then install the published CLI and point it
+at that installation. The CLI opens Clerk's hosted identity screen and returns
+directly to the terminal; Nimbase does not render a first-party login page:
 
 ```sh
+npm install --global nimbase
 NIMBASE_API_URL=http://localhost:3100 nimbase auth login
+NIMBASE_API_URL=http://localhost:3100 nimbase workspace create \
+  --title "Acme" \
+  --description "Company memory for Acme"
 ```
+
+The server root and all first-party control UI routes return `410 Gone`.
+Workspace creation, capture, sync, memory, and deployment operations are CLI
+workflows.
 
 ## What Community exposes
 

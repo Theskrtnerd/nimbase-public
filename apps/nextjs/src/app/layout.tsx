@@ -1,15 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 
 import { cn } from "@acme/ui";
-import { ThemeProvider } from "@acme/ui/theme";
-import { Toaster } from "@acme/ui/toast";
 
-import { GlobalThemeToggle } from "~/app/_components/global-theme-toggle";
-import { MotionProvider } from "~/app/_components/motion-provider";
 import { env } from "~/env";
-import { TRPCReactProvider } from "~/trpc/react";
 
 import "~/app/styles.css";
 
@@ -19,7 +13,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(
     env.VERCEL_ENV === "production" ? productionUrl : "http://localhost:3100",
   ),
-  title: "Nimbase",
+  title: "Nimbase — CLI-first company memory",
   description:
     "The secure memory layer that gives employees, customers, apps, and agents the company context they're allowed to know.",
   openGraph: {
@@ -34,6 +28,7 @@ export const metadata: Metadata = {
     site: "@jullerino",
     creator: "@jullerino",
   },
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
@@ -67,15 +62,7 @@ export default function RootLayout(props: { children: React.ReactNode }) {
           mono.variable,
         )}
       >
-        <ClerkProvider>
-          <ThemeProvider defaultTheme="light">
-            <MotionProvider>
-              <TRPCReactProvider>{props.children}</TRPCReactProvider>
-              <GlobalThemeToggle />
-              <Toaster />
-            </MotionProvider>
-          </ThemeProvider>
-        </ClerkProvider>
+        {props.children}
       </body>
     </html>
   );

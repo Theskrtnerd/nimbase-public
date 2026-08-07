@@ -1,6 +1,7 @@
 import "server-only";
 
-import { clerkClient, currentUser } from "@clerk/nextjs/server";
+import type { User } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 
 import type { InvitePort } from "@acme/api";
 import { resolveUserProfile } from "@acme/api";
@@ -28,11 +29,10 @@ export const clerkInvitePort: InvitePort = {
   },
 };
 
-// Called on dashboard load: turns pending email invites for the signed-in
-// user into memberships (+ their initial grants). Idempotent.
-export async function acceptPendingInvites(userId: string): Promise<number> {
-  const user = await currentUser();
-  if (!user) return 0;
+// Called during native login: turns pending email invites for the signed-in
+// user into memberships (+ their initial grants). Idempotent and independent
+// of a browser cookie so the CLI is a complete authentication path.
+export async function acceptPendingInvites(user: User): Promise<number> {
   const emails = user.emailAddresses
     .filter((email) => email.verification?.status === "verified")
     .map((email) => email.emailAddress.toLowerCase());
@@ -69,7 +69,7 @@ export async function acceptPendingInvites(userId: string): Promise<number> {
     const resolution = await resolveUserProfile(invite.workspaceId, {
       provider: "clerk",
       tenantId: "nimbase",
-      subject: userId,
+      subject: user.id,
       verifiedEmail: invite.email,
       displayName: user.fullName,
     });
@@ -78,7 +78,7 @@ export async function acceptPendingInvites(userId: string): Promise<number> {
       .insert(WorkspaceMember)
       .values({
         workspaceId: invite.workspaceId,
-        userId,
+        userId: user.id,
         userProfileId: resolution.profile.id,
         role: invite.role,
         name: user.fullName,
@@ -94,7 +94,7 @@ export async function acceptPendingInvites(userId: string): Promise<number> {
           .values({
             workspaceId: invite.workspaceId,
             principalType: "user",
-            principalId: userId,
+            principalId: user.id,
             folderId: grant.folderId,
             role: grant.role,
             createdByUserId: invite.invitedByUserId,

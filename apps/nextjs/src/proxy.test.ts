@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { groupMcpRewritePath } from "./proxy";
+import {
+  accountPortalSignInUrl,
+  groupMcpRewritePath,
+  isDisabledProductUi,
+} from "./proxy";
 
 const APP = "nimbase.ai";
 
@@ -45,5 +49,41 @@ describe("groupMcpRewritePath", () => {
     expect(
       groupMcpRewritePath("mcp.nimbase.ai", "/design/mcp", APP),
     ).toBeNull();
+  });
+});
+
+describe("isDisabledProductUi", () => {
+  it.each([
+    "/",
+    "/dashboard",
+    "/dashboard/workspaces/acme",
+    "/onboarding/workspace",
+    "/login",
+    "/sign-up/verify",
+    "/admin/workspaces",
+  ])("disables %s", (pathname) => {
+    expect(isDisabledProductUi(pathname)).toBe(true);
+  });
+
+  it.each([
+    "/api/workspaces",
+    "/desktop/authorize",
+    "/widget/public-key",
+    "/s/share",
+  ])("keeps the machine or deployment surface %s", (pathname) => {
+    expect(isDisabledProductUi(pathname)).toBe(false);
+  });
+});
+
+describe("accountPortalSignInUrl", () => {
+  it("sends authentication to Clerk and returns to the CLI callback", () => {
+    expect(
+      accountPortalSignInUrl(
+        "https://accounts.nimbase.ai",
+        "https://app.nimbase.ai/desktop/authorize?state=state-1",
+      ).toString(),
+    ).toBe(
+      "https://accounts.nimbase.ai/sign-in?redirect_url=https%3A%2F%2Fapp.nimbase.ai%2Fdesktop%2Fauthorize%3Fstate%3Dstate-1",
+    );
   });
 });

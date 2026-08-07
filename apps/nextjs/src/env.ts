@@ -15,6 +15,7 @@ export const env = createEnv({
    */
   server: {
     CLERK_SECRET_KEY: z.string().min(1),
+    CLERK_ACCOUNT_PORTAL_URL: z.url().default("https://accounts.nimbase.ai"),
     POSTGRES_URL: z.url(),
     DESKTOP_AUTH_SECRET: z.string().min(32),
     NIMBASE_WEB_URL: z.url().default("http://localhost:3100"),
@@ -51,12 +52,8 @@ export const env = createEnv({
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
     NEXT_PUBLIC_CLERK_SIGN_IN_URL: z.string().default("/login"),
     NEXT_PUBLIC_CLERK_SIGN_UP_URL: z.string().default("/sign-up"),
-    NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z
-      .string()
-      .default("/dashboard"),
-    NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z
-      .string()
-      .default("/dashboard"),
+    NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().default("/"),
+    NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().default("/"),
     NEXT_PUBLIC_NIMBASE_SOURCE_URL: z
       .url()
       .default("https://github.com/Theskrtnerd/nimbase-public"),

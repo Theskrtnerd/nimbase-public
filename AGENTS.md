@@ -8,9 +8,14 @@ Capture → Compile → Share. This is a pnpm/Turborepo monorepo.
 1. Backend and runtime systems: domain packages, API contracts, permissions,
    queues, capture/compile, reliability, observability, and tests.
 2. `apps/cli/`: the primary user interface and scriptable control plane.
-3. `apps/nextjs/`: authentication, REST/API, workers, MCP, and shares.
+3. `apps/nextjs/`: authentication callbacks, REST/API, workers, MCP, and shares.
 4. `packages/connector-sdk/`: provider-neutral wire contracts for independent
    out-of-process connectors.
+
+The first-party product UI is disabled. Do not add product workflows there;
+add complete CLI commands and the server contracts they need. Identity and
+provider consent use hosted third-party screens, while public shares and other
+deployed surfaces remain CLI-created outputs rather than a control plane.
 
 ## Core invariants
 
